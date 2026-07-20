@@ -1,0 +1,5 @@
+
+.vscode/
+opencode.jsonc
+.env
+.venv/
