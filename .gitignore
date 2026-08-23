@@ -5,3 +5,7 @@ opencode.jsonc
 .venv/
 node_modules/
 package-lock.json
+
+# Compiler outputs
+compiler/**/build/*
+!compiler/**/build/.gitkeep
