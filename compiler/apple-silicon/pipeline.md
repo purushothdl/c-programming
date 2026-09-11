@@ -72,6 +72,15 @@ Headers provide declarations to the compiler; they do not provide a separate
 linkable implementation. The implementation must be present in an object
 file or library passed to the linker.
 
+The commands above produce the unoptimized baseline (`-O0`). Keep optimized
+assembly in a separate snapshot directory so that it can be compared directly:
+
+```sh
+mkdir -p build/o1
+clang -O1 -S src/main.c -Isrc -o build/o1/main.s
+clang -O1 -S src/square.c -Isrc -o build/o1/square.s
+```
+
 ## Apple Clang via `gcc`
 
 On this Mac, `gcc` is Apple Clang aliased as GCC. The same commands work with
