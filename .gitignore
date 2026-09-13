@@ -6,6 +6,6 @@ opencode.jsonc
 node_modules/
 package-lock.json
 
-# Compiler outputs
-compiler/**/build/*
-!compiler/**/build/.gitkeep
+# Build outputs
+build/*
+!build/.gitkeep

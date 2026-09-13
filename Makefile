@@ -19,10 +19,11 @@ ASMFLAGS := $(CPUFLAGS) -ffreestanding -fno-builtin -Wall -Wextra
 OPTS := 0 1 2
 LDFLAGS := $(CPUFLAGS) -T linker.ld -nostdlib -Wl,--gc-sections
 
-PROGRAMS := blink button systick
-EXAMPLES := regs
+# Discovered from the source trees, so adding a program needs no Makefile edit.
+PROGRAMS := $(notdir $(basename $(wildcard programs/*.c)))
+EXAMPLES := $(notdir $(basename $(wildcard examples/*.c)))
 
-.PHONY: all programs flash clean examples example program
+.PHONY: all programs flash clean examples example program $(PROGRAMS)
 
 all: programs
 
@@ -31,7 +32,7 @@ programs: $(PROGRAMS)
 # Build one board program: make program P=blink
 program:
 	@mkdir -p $(BUILD)/$(P)
-	$(CC) $(CFLAGS) -c programs/$(P)/main.c -o $(BUILD)/$(P)/main.o
+	$(CC) $(CFLAGS) -c programs/$(P).c -o $(BUILD)/$(P)/main.o
 	$(CC) $(CPUFLAGS) -c startup.s -o $(BUILD)/$(P)/startup.o
 	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILD)/$(P)/$(P).map \
 		$(BUILD)/$(P)/main.o $(BUILD)/$(P)/startup.o \
@@ -39,10 +40,8 @@ program:
 	$(OBJCOPY) -O binary $(BUILD)/$(P)/$(P).elf $(BUILD)/$(P)/$(P).bin
 	$(OBJDUMP) -d -S $(BUILD)/$(P)/$(P).elf > $(BUILD)/$(P)/$(P).lst
 
-# Convenience targets, one per program in PROGRAMS
-blink: ; @$(MAKE) --no-print-directory program P=blink
-button: ; @$(MAKE) --no-print-directory program P=button
-systick: ; @$(MAKE) --no-print-directory program P=systick
+# Convenience target per program: make blink / make button / make systick
+$(PROGRAMS): %: ; @$(MAKE) --no-print-directory program P=$*
 
 # Flash a program to the board (defaults to blink)
 flash:
@@ -56,7 +55,7 @@ example: example-$(NAME)
 example-%:
 	@mkdir -p $(BUILD)/examples/$*
 	@for opt in $(OPTS); do \
-		$(CC) $(ASMFLAGS) -O$$opt -S examples/$*/$*.c \
+		$(CC) $(ASMFLAGS) -O$$opt -S examples/$*.c \
 			-o $(BUILD)/examples/$*/$*-O$$opt.s; \
 	done
 

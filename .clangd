@@ -1,9 +1,0 @@
-CompileFlags:
-  Add:
-    - --target=thumbv7em-none-eabi
-    - -mcpu=cortex-m4
-    - -mthumb
-    - -mfloat-abi=soft
-    - -ffreestanding
-    - -DSTM32F446xx
-    - -Icompiler/stm32-cortex-m4/cmsis

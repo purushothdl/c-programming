@@ -10,7 +10,8 @@ Board and chip documentation: `docs/` and the RM0390/UM1724 PDFs.
 ```text
 startup.s      reset handler + vector table, shared by every program
 linker.ld      Flash/RAM memory layout, shared by every program
-programs/      firmware you flash to the board (one folder per program)
+cmsis/         CMSIS core + STM32F446xx device headers
+programs/      firmware you flash to the board, one flat <name>.c per program
 examples/      C sources compiled to assembly for study, never flashed
 build/         generated output, mirrors programs/ and examples/, gitignored
 ```
@@ -49,10 +50,12 @@ These are compiled with `-S` only. Nothing is linked or flashed.
 
 ## Adding a new program
 
-1. Create `programs/<name>/main.c`.
-2. Add `<name>` to `PROGRAMS` and one `make` convenience line in the Makefile.
+1. Create `programs/<name>.c` (needs a `int main(void)`).
+2. That's it: the Makefile discovers `programs/*.c`, so `make <name>` works
+   immediately.
 
 ## Adding a new example
 
-1. Create `examples/<name>/<name>.c`.
-2. Add `<name>` to `EXAMPLES` and one `example-<name>` convenience line.
+1. Create `examples/<name>.c`.
+2. That's it: the Makefile discovers `examples/*.c`, so `make example NAME=<name>`
+   works immediately.

@@ -7,7 +7,11 @@
   - This is the **only** authoritative register definition for this board.
   - Ignore any other `.svd` files on disk (e.g. samples bundled inside an MCP server's `node_modules/`) — never use them for this project.
   - When querying the SVD, always pass `svd_file: "svd/stm32f446re.svd"` and verify the returned device name is `STM32F446`.
-- **Toolchain / build**: (to be added)
+- **Toolchain / build**: `arm-none-eabi-gcc` + `probe-rs`; driven by the root `Makefile`.
+  - `make <name>` builds `programs/<name>.c` (auto-discovered) into `build/<name>/`.
+  - `make flash PROGRAM=<name>` builds and flashes over SWD.
+  - `make example NAME=<name>` emits assembly for `examples/<name>.c` at -O0/1/2.
+  - Compile flags: `-mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding -DSTM32F446xx -Icmsis`.
 
 ## Reference manuals (PDF)
 
