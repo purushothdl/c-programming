@@ -11,11 +11,28 @@
 
 .section .isr_vector, "a", %progbits
 .align 2
-.word _estack
-.word Reset_Handler
-.rept 14
+.word _estack                /* 0x00  initial stack pointer  */
+.word Reset_Handler          /* 0x04  reset                  */
+.word Default_Handler        /* 0x08  NMI                    */
+.word Default_Handler        /* 0x0C  HardFault              */
+.word Default_Handler        /* 0x10  MemManage              */
+.word Default_Handler        /* 0x14  BusFault               */
+.word Default_Handler        /* 0x18  UsageFault             */
+.word Default_Handler        /* 0x1C  reserved               */
+.word Default_Handler        /* 0x20  reserved               */
+.word Default_Handler        /* 0x24  reserved               */
+.word Default_Handler        /* 0x28  reserved               */
+.word Default_Handler        /* 0x2C  SVCall                 */
+.word Default_Handler        /* 0x30  DebugMonitor           */
+.word Default_Handler        /* 0x34  reserved               */
+.word Default_Handler        /* 0x38  PendSV                 */
+.word SysTick_Handler        /* 0x3C  SysTick (exception 15) */
+
+/* EXTI lines 10..15 share one vector: IRQ 40 -> exception 56. */
+.rept 40                     /* 0x40..0xDC  IRQ 0..39 (unused, default) */
 .word Default_Handler
 .endr
+.word EXTI15_10_IRQHandler   /* 0xE0  EXTI15_10 (IRQ 40) */
 
 .section .text.Reset_Handler, "ax", %progbits
 .thumb_func
@@ -57,3 +74,12 @@ Reset_Handler:
 Default_Handler:
     b Default_Handler
 .size Default_Handler, . - Default_Handler
+
+/* A program may define a real SysTick_Handler; if it does not, this weak
+   default is used so every program links. */
+.weak SysTick_Handler
+.thumb_set SysTick_Handler, Default_Handler
+
+/* Same weak-default trick for EXTI15_10 (IRQ 40). */
+.weak EXTI15_10_IRQHandler
+.thumb_set EXTI15_10_IRQHandler, Default_Handler
