@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPI Explorer</title>
+<style>
+:root{
+  --bg:#fafaf7; --card:#ffffff; --fg:#1f2328; --muted:#6b7280; --line:#d8dbe0;
+  --sig:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706;
+  --sigbg:rgba(37,99,235,.12); --okbg:rgba(22,163,74,.13); --badbg:rgba(220,38,38,.12); --grid:rgba(120,120,130,.25);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14161a; --card:#1c1f25; --fg:#e6e8eb; --muted:#9aa1ab; --line:#333844;
+    --sig:#60a5fa; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24;
+    --sigbg:rgba(96,165,250,.16); --okbg:rgba(74,222,128,.16); --badbg:rgba(248,113,113,.16); --grid:rgba(160,165,175,.25);}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}
+p.sub{margin:0 0 18px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 2px}
+.cap{color:var(--muted);font-size:13px;margin:0 0 8px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.comp{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+.comp b{display:block;font-size:14px}
+.comp code{font-size:12px;color:var(--sig)}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 20px;align-items:end}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+select,input[type=text]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:14px ui-monospace,Menlo,monospace}
+button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:5px 11px;font:13px inherit;cursor:pointer}
+button:hover{border-color:var(--sig)} button.primary{background:var(--sig);color:#fff;border-color:var(--sig)}
+button.on{border-color:var(--sig);background:var(--sigbg)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+input[type=range]{width:100%}
+svg{width:100%;height:auto;display:block}
+canvas{width:100%;display:block}
+.cell-tx{fill:var(--sigbg);stroke:var(--sig)} .cell-rx{fill:var(--okbg);stroke:var(--ok)} .cell-q{fill:var(--badbg);stroke:var(--bad)}
+.box{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+svg text{fill:var(--fg);font-family:ui-monospace,Menlo,monospace}
+svg .m{fill:var(--muted)}
+.log{font-size:13.5px;margin:6px 0 0;padding:0;list-style:none}
+.log li{padding:2px 0}
+.who{display:inline-block;min-width:54px;font-weight:600}
+.M{color:var(--sig)} .S{color:var(--warn)}
+.res{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font:13px ui-monospace,Menlo,monospace}
+.res span{padding:3px 9px;border-radius:99px;border:1px solid var(--line)}
+.res .good{border-color:var(--ok);color:var(--ok)} .res .badr{border-color:var(--bad);color:var(--bad)}
+.callout{border-left:3px solid var(--warn);padding:6px 12px;background:var(--card);border-radius:0 8px 8px 0;margin:0 0 16px;font-size:13.5px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 6px}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SPI: a shared clock instead of a shared baud rate</h1>
+  <p class="sub">Where UART needs both sides to <em>guess</em> the same timing, SPI just sends the timing along. One wire carries the clock, and every clock edge says exactly when to put a bit on the wire and when to read it.</p>
+
+  <div class="card">
+    <h2>The four wires</h2>
+    <div class="grid4" style="margin-top:6px">
+      <div class="comp"><b>SCLK <code>serial clock</code></b>Driven by the <u>master only</u>. Every pulse moves one bit each way. No clock, no data, so the slave never needs its own baud generator.</div>
+      <div class="comp"><b>MOSI <code>master out, slave in</code></b>Master's data to the slave. Driven by master, read by slave.</div>
+      <div class="comp"><b>MISO <code>master in, slave out</code></b>Slave's data to the master. Driven by slave, read by master, at the <em>same time</em> as MOSI (full duplex).</div>
+      <div class="comp"><b>CS / SS <code>chip select, active low</code></b>Master pulls it low to wake one slave and frames the transfer. High = slave ignores the bus and releases MISO (Hi-Z). One CS per slave.</div>
+    </div>
+    <p class="cap" style="margin-top:10px">Inside each chip sits an <b>8-bit shift register</b>. The two registers are wired in a ring (master out → slave in, slave out → master in). After 8 clock pulses the two bytes have <b>swapped places</b>. Every SPI read is also a write, and vice versa.</p>
+  </div>
+
+  <div class="card">
+    <div class="controls">
+      <div><label>Mode preset (CPOL, CPHA)</label>
+        <div class="row" id="presets"></div></div>
+      <div><label>CPOL: clock idle level</label><select id="cpol"><option value="0">0 &mdash; idle low</option><option value="1">1 &mdash; idle high</option></select></div>
+      <div><label>CPHA: sample on which edge</label><select id="cpha"><option value="0">0 &mdash; leading edge</option><option value="1">1 &mdash; trailing edge</option></select></div>
+      <div><label>Bit order</label><select id="ord"><option value="1">MSB first</option><option value="0">LSB first</option></select></div>
+      <div><label>Master sends (hex)</label><input type="text" id="mb" value="A5" maxlength="2"></div>
+      <div><label>Slave sends (hex)</label><input type="text" id="sb" value="3C" maxlength="2"></div>
+      <div><label><input type="checkbox" id="match" checked> Slave configured with the same mode</label>
+        <div class="row" id="sbox" style="display:none;gap:8px">
+          <select id="scpol"><option value="0">slave CPOL 0</option><option value="1">slave CPOL 1</option></select>
+          <select id="scpha"><option value="0">slave CPHA 0</option><option value="1">slave CPHA 1</option></select>
+        </div></div>
+    </div>
+    <div class="callout" id="modeInfo" style="margin:12px 0 0"></div>
+  </div>
+
+  <div class="card">
+    <h2>Master &harr; slave</h2>
+    <div class="legend"><span><i style="background:var(--sigbg);border:1px solid var(--sig)"></i>bit not sent yet</span><span><i style="background:var(--okbg);border:1px solid var(--ok)"></i>bit received</span><span><i style="background:var(--badbg);border:1px solid var(--bad)"></i>read a floating line (?)</span><span><i style="border:2.5px solid var(--warn)"></i>bit currently on the wire</span></div>
+    <svg id="dg" viewBox="0 0 900 372"></svg>
+    <div class="row" style="margin:6px 0">
+      <button id="rst">&#9198; Reset</button><button id="back">&#9664; Back</button>
+      <button id="play" class="primary">&#9654; Play</button><button id="next">Next &#9654;</button>
+      <select id="spd" style="width:auto"><option value="1100">slow</option><option value="650" selected>normal</option><option value="250">fast</option></select>
+      <span id="stepLbl" class="cap" style="margin:0 0 0 8px"></span>
+    </div>
+    <input type="range" id="scrub" min="0" max="18" value="0">
+    <h2 id="evTitle" style="margin-top:10px"></h2>
+    <ul class="log" id="evLog"></ul>
+    <div class="res" id="res"></div>
+  </div>
+
+  <div class="card">
+    <h2>Timing diagram</h2>
+    <p class="cap">Dotted lines mark clock edges: <b style="color:var(--ok)">green</b> = the master samples here, <b style="color:var(--warn)">orange</b> = the master changes its output here. Diamonds show where a bit was actually read. The slave's data window (MISO) shifts when its mode differs.</p>
+    <canvas id="cw" height="320"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Why there's no clock drift here</h2>
+    <p class="cap" style="margin:0">UART's problem was two independent clocks slowly disagreeing. In SPI the slave doesn't count time at all. It just reacts to edges the master produces, so master and slave can never fall out of step, and you can run it from kHz to tens of MHz. What <em>can</em> go wrong is agreeing on <b>which edge</b> to use. Untick "same mode" above, set the slave to a different CPHA, and watch the bits get read at the wrong moment (or while the line is still floating).</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const hx = b => b.toString(16).toUpperCase().padStart(2,'0');
+const bin = b => b.toString(2).padStart(8,'0');
+
+const st = {cpol:0, cpha:0, msb:1, sCpol:0, sCpha:0, match:true, mB:0xA5, sB:0x3C, step:0, timer:null};
+
+[[0,0],[0,1],[1,0],[1,1]].forEach(([p,a],i)=>{
+  const b=document.createElement('button'); b.textContent='Mode '+i; b.dataset.m=i;
+  b.onclick=()=>{ $('cpol').value=p; $('cpha').value=a; readCfg(); }; $('presets').appendChild(b);
+});
+
+/* ---------- model ---------- */
+const cells = b => Array.from({length:8},(_,i)=>({v:(b>>(7-i))&1, t:'tx'}));
+const outBit = (d) => st.msb ? d.R[0].v : d.R[7].v;
+const shiftIn = (R,inb) => { const c={v:inb,t: inb==='?'?'q':'rx'}; return st.msb ? [...R.slice(1),c] : [c,...R.slice(0,7)]; };
+const mkDev = (byte,cpol,cpha,name) => ({name, R:cells(byte), cpha, cpol, sample: cpol===cpha?'R':'F', shiftK: cpol===cpha?'F':'R', latch:null, line:null, started:false, shifts:0, drives:[]});
+
+function simulate(){
+  const M = mkDev(st.mB, st.cpol, st.cpha, 'Master');
+  const S = mkDev(st.sB, st.match?st.cpol:st.sCpol, st.match?st.cpha:st.sCpha, 'Slave');
+  const snaps=[], samples=[]; let cs=1, sclk=st.cpol;
+  const wireOf = d => d===M?'MOSI':'MISO';
+  const drive = (d,step,log,why) => { const k=d.drives.length; d.line=outBit(d); d.drives.push({step, bit: st.msb?7-k:k}); log.push({w:d===M?'M':'S', t:`${d.name} ${why} bit ${d.drives[k].bit} (=${d.line}) on ${wireOf(d)}`}); };
+  const snap = (title,log) => snaps.push({title, log, cs, sclk, mosi:M.line, miso:S.line,
+    M:{R:M.R.map(c=>({...c})), latch:M.latch, line:M.line}, S:{R:S.R.map(c=>({...c})), latch:S.latch, line:S.line}});
+  const doShift = (d,step,log) => {
+    const lv = d.latch===null?'?':d.latch; d.R = shiftIn(d.R, lv); d.shifts++;
+    log.push({w:d===M?'M':'S', t:`${d.name} shifts its register: ${lv==='?'?'a floating ?':'received '+lv} enters`});
+  };
+
+  snap('Idle: CS is high', [{w:'-',t:'Slave is deselected and ignores the bus. MISO is not driven (Z). The clock rests at its idle level (CPOL).'}]);
+  const log1=[]; cs=0;
+  [M,S].forEach(d=>{ if(d.cpha===0) drive(d,1,log1,'puts first'); else log1.push({w:d===M?'M':'S', t:`${d.name} (CPHA=1) waits: its first bit appears on the first clock edge`}); });
+  snap('Master pulls CS low: the slave is selected', log1);
+
+  for(let n=0;n<16;n++){
+    const step=n+2, kind = (n%2===0) === (st.cpol===0) ? 'R':'F', log=[];
+    const mosiB=M.line, misoB=S.line; sclk = kind==='R'?1:0;
+    const lead = n%2===0;
+    [[M,misoB,'MISO'],[S,mosiB,'MOSI']].forEach(([d,val,wire])=>{
+      if(kind===d.sample){ d.latch = val===null?'?':val; samples.push({t:step, who:d===M?'M':'S', val:d.latch});
+        log.push({w:d===M?'M':'S', t:`${d.name} SAMPLES ${wire} → ${val===null?'? (line is floating!)':val}`}); }
+    });
+    [M,S].forEach(d=>{
+      if(kind!==d.shiftK) return;
+      if(d.cpha===1 && !d.started){ d.started=true; drive(d,step,log,'puts first'); }
+      else if(d.shifts<8){ doShift(d,step,log); if(d.shifts<8 || d.cpha===1) drive(d,step,log,'puts next'); }
+    });
+    snap(`Clock edge ${n+1}/16: ${kind==='R'?'rising ↑':'falling ↓'} (${lead?'leading':'trailing'})`, log);
+  }
+  const log2=[]; cs=1;
+  [M,S].forEach(d=>{ if(d.cpha===1 && d.shifts<8) doShift(d,18,log2); d.line=null; });
+  log2.push({w:'-',t:'CS goes high: transfer ends, the slave lets go of MISO.'});
+  snap('Master releases CS: transfer complete', log2);
+  const byte = R => R.reduce((a,c,i)=>a|((c.v===1?1:0)<<(7-i)),0);
+  const anyQ = R => R.some(c=>c.v==='?');
+  return {snaps, samples, M, S, mGot:byte(M.R), sGot:byte(S.R), mQ:anyQ(M.R), sQ:anyQ(S.R)};
+}
+
+/* ---------- rendering ---------- */
+let sim=null;
+const T = s => s===18?19:s;      // step → time (clock half-periods)
+
+function renderDiagram(sn){
+  const bx=(x,t,sub)=>`<rect class="box" x="${x}" y="10" width="330" height="352" rx="12"/><text x="${x+14}" y="34" font-size="16" font-weight="700">${t}</text><text class="m" x="${x+14}" y="52" font-size="11">${sub}</text>`;
+  let s=`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs>`;
+  s+=bx(20,'MASTER','e.g. STM32F446RE SPI1')+bx(570,'SLAVE','e.g. flash, sensor, display');
+  const wires=[
+    {y:86, n:'SCLK', v:sn.sclk, dir:1, d:'clock: master only'},
+    {y:141,n:'MOSI', v:sn.mosi, dir:1, d:'master → slave'},
+    {y:196,n:'MISO', v:sn.miso, dir:-1,d:'slave → master'},
+    {y:251,n:'CS',   v:sn.cs,   dir:1, d:'low = selected'}];
+  wires.forEach(w=>{
+    const col = w.v===null?css('--muted'): (w.n==='CS'? (w.v===0?css('--warn'):css('--muted')) : (w.v===1?css('--sig'):css('--muted')));
+    const x1=w.dir>0?350:570, x2=w.dir>0?570:350;
+    s+=`<g style="color:${col}"><line x1="${x1}" y1="${w.y}" x2="${x2}" y2="${w.y}" stroke="${col}" stroke-width="${w.v===null?1.5:3.5}" ${w.v===null?'stroke-dasharray="5 5"':''} marker-end="url(#ar)"/></g>`;
+    s+=`<text x="460" y="${w.y-18}" text-anchor="middle" font-size="13" font-weight="700">${w.n}</text><text class="m" x="460" y="${w.y-5}" text-anchor="middle" font-size="10.5">${w.d}</text>`;
+    s+=`<rect x="445" y="${w.y+6}" width="30" height="20" rx="5" fill="var(--card)" stroke="${col}"/><text x="460" y="${w.y+20}" text-anchor="middle" font-size="13" font-weight="700" style="fill:${col}">${w.v===null?'Z':w.v}</text>`;
+  });
+  [[20,sn.M,'M'],[570,sn.S,'S']].forEach(([x0,dev,id])=>{
+    s+=`<text class="m" x="${x0+14}" y="${id==='M'?96:96}" font-size="10">${id==='M'?'drives SCLK, MOSI, CS':'drives MISO only'}</text>`;
+    s+=`<text class="m" x="${x0+14}" y="304" font-size="11">8-bit shift register</text>`;
+    const outIdx = st.msb?0:7;
+    dev.R.forEach((c,i)=>{
+      const cx=x0+14+i*38, cls=c.t==='tx'?'cell-tx':c.t==='rx'?'cell-rx':'cell-q', on = dev.line!==null && i===outIdx;
+      s+=`<rect class="${cls}" x="${cx}" y="312" width="34" height="34" rx="6" stroke-width="${on?3:1.5}" ${on?'style="stroke:var(--warn)"':''}/><text x="${cx+17}" y="334" text-anchor="middle" font-size="16" font-weight="700">${c.v}</text>`;
+      s+=`<text class="m" x="${cx+17}" y="360" text-anchor="middle" font-size="9">b${7-i}</text>`;
+    });
+    s+=`<text class="m" x="${x0+314}" y="304" text-anchor="end" font-size="11">input latch: ${dev.latch===null?'—':dev.latch}</text>`;
+  });
+  $('dg').innerHTML=s;
+}
+
+function drawWave(){
+  const c=$('cw'), dpr=window.devicePixelRatio||1, w=c.clientWidth, h=+c.getAttribute('height');
+  c.width=w*dpr; c.height=h*dpr; const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  const total=21, padL=96, padR=10, W=w-padL-padR, X=t=>padL+t/total*W, LH=76;
+  const lanes=[{k:'cs',l:'CS',s:'active low'},{k:'sclk',l:'SCLK'},{k:'mosi',l:'MOSI'},{k:'miso',l:'MISO'}];
+  const yv=(i,v)=> v===null? 8+i*LH+LH/2-4 : 8+i*LH+(v?16:LH-30);
+  g.font='12px ui-monospace,Menlo,monospace'; g.textBaseline='middle';
+  // edge guides
+  for(let n=0;n<16;n++){
+    const kind=(n%2===0)===(st.cpol===0)?'R':'F', t=2+n, isS = kind===sim.M.sample;
+    g.strokeStyle=isS?css('--ok'):css('--warn'); g.globalAlpha=.45; g.setLineDash([2,4]);
+    g.beginPath(); g.moveTo(X(t),4); g.lineTo(X(t),h-4); g.stroke();
+  }
+  g.setLineDash([]); g.globalAlpha=1;
+  lanes.forEach((L,i)=>{
+    g.fillStyle=css('--fg'); g.textAlign='left'; g.fillText(L.l,8,8+i*LH+LH/2-8); if(L.s){g.fillStyle=css('--muted'); g.font='10px ui-monospace,monospace'; g.fillText(L.s,8,8+i*LH+LH/2+8); g.font='12px ui-monospace,Menlo,monospace';}
+    g.strokeStyle=css('--grid'); g.beginPath(); g.moveTo(padL,8+(i+1)*LH-4); g.lineTo(w-padR,8+(i+1)*LH-4); g.stroke();
+  });
+  const path = (clipX)=>{
+    lanes.forEach((L,i)=>{
+      g.save(); if(clipX!==null){ g.beginPath(); g.rect(0,0,clipX,h); g.clip(); }
+      g.strokeStyle=css('--sig'); g.lineWidth=2.4; let prevY=null;
+      sim.snaps.forEach((sn,si)=>{
+        const v=sn[L.k], y=yv(i,v), t0=T(si), t1=si<18?T(si+1):total;
+        g.setLineDash(v===null?[4,4]:[]); g.globalAlpha=v===null?.5:1;
+        if(prevY!==null && prevY!==y){ g.setLineDash([]); g.beginPath(); g.moveTo(X(t0),prevY); g.lineTo(X(t0),y); g.stroke(); g.setLineDash(v===null?[4,4]:[]); }
+        g.beginPath(); g.moveTo(X(t0),y); g.lineTo(X(t1),y); g.stroke(); prevY=y;
+      });
+      g.restore();
+    });
+  };
+  g.globalAlpha=.22; path(null); g.globalAlpha=1; const cur=X(T(st.step))+1; path(cur);
+  // bit labels
+  g.font='11px ui-monospace,monospace'; g.textAlign='center'; g.fillStyle=css('--muted');
+  [[sim.M,2],[sim.S,3]].forEach(([d,li])=>d.drives.forEach((dr,k)=>{
+    if(T(dr.step)>T(st.step)) return;
+    const nxt=d.drives[k+1], t0=T(dr.step), t1=nxt?T(nxt.step):19;
+    g.fillText('b'+dr.bit, X((t0+t1)/2), 8+li*LH+6);
+  }));
+  // sample diamonds
+  sim.samples.forEach(sm=>{ if(sm.t>st.step) return;
+    const li=sm.who==='M'?3:2, v=sm.val, y= v==='?'?yv(li,null):yv(li,v), x=X(sm.t);
+    g.fillStyle = v==='?'?css('--bad'):css('--ok'); g.beginPath(); g.moveTo(x,y-7); g.lineTo(x+6,y); g.lineTo(x,y+7); g.lineTo(x-6,y); g.fill();
+  });
+  g.strokeStyle=css('--fg'); g.lineWidth=1.2; g.setLineDash([6,4]); g.beginPath(); g.moveTo(cur,2); g.lineTo(cur,h-2); g.stroke(); g.setLineDash([]);
+}
+
+function render(){
+  const sn=sim.snaps[st.step];
+  renderDiagram(sn); drawWave();
+  $('stepLbl').textContent=`step ${st.step} / 18`; $('scrub').value=st.step;
+  $('evTitle').textContent=sn.title;
+  $('evLog').innerHTML=sn.log.map(l=>`<li>${l.w==='-'?'':`<span class="who ${l.w}">${l.w==='M'?'Master':'Slave'}</span>`}${l.t.replace(/^(Master|Slave) /,'')}</li>`).join('');
+  const done=st.step===18;
+  const chip=(who,got,exp,q)=>`<span class="${got===exp&&!q?'good':'badr'}">${who} got 0x${hx(got)} <small>(${bin(got)})</small> — wanted 0x${hx(exp)} ${got===exp&&!q?'✓':'✗'}</span>`;
+  $('res').innerHTML = done ? chip('Master',sim.mGot,st.sB,sim.mQ)+chip('Slave',sim.sGot,st.mB,sim.sQ)
+    : `<span>Master will send 0x${hx(st.mB)} (${bin(st.mB)}) &nbsp;|&nbsp; Slave will send 0x${hx(st.sB)} (${bin(st.sB)})</span>`;
+}
+
+function info(){
+  const lead = st.cpol===0?'rising':'falling', trail = st.cpol===0?'falling':'rising';
+  const sEdge = st.cpha===0?lead:trail, cEdge = st.cpha===0?trail:lead;
+  const mode = st.cpol*2+st.cpha;
+  $('modeInfo').innerHTML = `<b>Mode ${mode}</b> &mdash; clock idles <b>${st.cpol?'high':'low'}</b>. The first (leading) edge is ${lead}, the second (trailing) is ${trail}. `
+   +`Data is <b style="color:var(--ok)">sampled on the ${sEdge} edge</b> and <b style="color:var(--warn)">changed on the ${cEdge} edge</b>. `
+   +(st.cpha===0?'The first bit must already be on the wire before the first edge, because that edge reads it.':'The first edge only puts the first bit out; the second edge reads it.');
+  document.querySelectorAll('#presets button').forEach(b=>b.classList.toggle('on',+b.dataset.m===mode));
+}
+
+function readCfg(){
+  st.cpol=+$('cpol').value; st.cpha=+$('cpha').value; st.msb=+$('ord').value;
+  st.mB=(parseInt($('mb').value,16)||0)&255; st.sB=(parseInt($('sb').value,16)||0)&255;
+  st.match=$('match').checked; $('sbox').style.display=st.match?'none':'flex';
+  st.sCpol=+$('scpol').value; st.sCpha=+$('scpha').value;
+  info(); sim=simulate(); render();
+}
+['cpol','cpha','ord','mb','sb','match','scpol','scpha'].forEach(id=>$(id).addEventListener('input',readCfg));
+
+const go = s => { st.step=Math.max(0,Math.min(18,s)); render(); };
+const stop = () => { clearInterval(st.timer); st.timer=null; $('play').innerHTML='&#9654; Play'; };
+const start = () => { if(st.step>=18) st.step=0; $('play').innerHTML='&#10074;&#10074; Pause'; render();
+  st.timer=setInterval(()=>{ if(st.step>=18){ stop(); return; } go(st.step+1); }, +$('spd').value); };
+$('play').onclick=()=>st.timer?stop():start();
+$('spd').onchange=()=>{ if(st.timer){ stop(); start(); } };
+$('next').onclick=()=>{stop();go(st.step+1)}; $('back').onclick=()=>{stop();go(st.step-1)};
+$('rst').onclick=()=>{stop();go(0)}; $('scrub').oninput=e=>{stop();go(+e.target.value)};
+addEventListener('resize',render);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+readCfg();
+</script>
+</body>
+</html>
