@@ -7,19 +7,19 @@
 <style>
 :root{
   --bg:#fafaf7; --card:#ffffff; --fg:#1f2328; --muted:#6b7280; --line:#d8dbe0;
-  --sig:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706;
-  --sigbg:rgba(37,99,235,.12); --okbg:rgba(22,163,74,.13); --badbg:rgba(220,38,38,.12); --grid:rgba(120,120,130,.25);
+  --sig:#2563eb; --sl:#9333ea; --ok:#16a34a; --bad:#dc2626; --warn:#d97706;
+  --sigbg:rgba(37,99,235,.12); --slbg:rgba(147,51,234,.12); --okbg:rgba(22,163,74,.13); --badbg:rgba(220,38,38,.12); --grid:rgba(120,120,130,.25);
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#14161a; --card:#1c1f25; --fg:#e6e8eb; --muted:#9aa1ab; --line:#333844;
-    --sig:#60a5fa; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24;
-    --sigbg:rgba(96,165,250,.16); --okbg:rgba(74,222,128,.16); --badbg:rgba(248,113,113,.16); --grid:rgba(160,165,175,.25);}
+    --sig:#60a5fa; --sl:#c084fc; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24;
+    --sigbg:rgba(96,165,250,.16); --slbg:rgba(192,132,252,.16); --okbg:rgba(74,222,128,.16); --badbg:rgba(248,113,113,.16); --grid:rgba(160,165,175,.25);}
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.wrap{max-width:1120px;margin:0 auto;padding:24px 16px 48px}
-h1{font-size:22px;margin:0 0 4px}
-p.sub{margin:0 0 18px;color:var(--muted)}
+.wrap{max-width:1160px;margin:0 auto;padding:24px 16px 56px}
+h1{font-size:24px;margin:0 0 4px}
+p.sub{margin:0 0 18px;color:var(--muted);max-width:820px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
 .card h2{font-size:15px;margin:0 0 2px}
 .cap{color:var(--muted);font-size:13px;margin:0 0 8px}
@@ -27,7 +27,7 @@ p.sub{margin:0 0 18px;color:var(--muted)}
 .comp{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
 .comp b{display:block;font-size:14px}
 .comp code{font-size:12px;color:var(--sig)}
-.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 20px;align-items:end}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 20px;align-items:start}
 label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
 select,input[type=text]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:14px ui-monospace,Menlo,monospace}
 button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:5px 11px;font:13px inherit;cursor:pointer}
@@ -44,13 +44,33 @@ svg .m{fill:var(--muted)}
 .log{font-size:13.5px;margin:6px 0 0;padding:0;list-style:none}
 .log li{padding:2px 0}
 .who{display:inline-block;min-width:54px;font-weight:600}
-.M{color:var(--sig)} .S{color:var(--warn)}
+.M{color:var(--sig)} .S{color:var(--sl)}
 .res{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font:13px ui-monospace,Menlo,monospace}
 .res span{padding:3px 9px;border-radius:99px;border:1px solid var(--line)}
 .res .good{border-color:var(--ok);color:var(--ok)} .res .badr{border-color:var(--bad);color:var(--bad)}
 .callout{border-left:3px solid var(--warn);padding:6px 12px;background:var(--card);border-radius:0 8px 8px 0;margin:0 0 16px;font-size:13.5px}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 6px}
 .legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+.legend i.dot{border-radius:50%} .legend i.dia{transform:rotate(45deg);width:8px;height:8px}
+.bits{display:flex;gap:3px;margin-top:6px}
+.bits button{flex:1;padding:3px 0;font:600 13px ui-monospace,Menlo,monospace;min-width:0}
+.bits button.one{border-color:var(--sig);background:var(--sigbg)}
+.bits.s button.one{border-color:var(--sl);background:var(--slbg)}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.modes button{text-align:left;padding:8px 10px;border-radius:10px;line-height:1.35}
+.modes button b{font-size:14px}
+.modes button span{display:block;font-size:12px;color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.two figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.two figcaption{font-size:13px;margin-top:4px}
+.keys{font-size:12px;color:var(--muted);margin:6px 0 0}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font:11px ui-monospace,Menlo,monospace}
+
+@keyframes travel{from{transform:translateX(0)}to{transform:translateX(var(--dx))}}
+@keyframes flash{from{stroke-width:5.5}to{stroke-width:1.5}}
+.dot{animation:travel var(--dur,.55s) ease-in-out forwards}
+.flash{animation:flash .7s ease-out}
+@media (prefers-reduced-motion: reduce){ .dot{animation:none;transform:translateX(var(--dx))} .flash{animation:none} }
 </style>
 </head>
 <body>
@@ -70,14 +90,18 @@ svg .m{fill:var(--muted)}
   </div>
 
   <div class="card">
+    <h2>Pick a mode</h2>
+    <p class="cap">Each mode is a (CPOL, CPHA) pair. <b>CPOL</b> = the level the clock rests at. <b>CPHA</b> = whether data is read on the first or second edge. Click one to load it.</p>
+    <div class="modes" id="modes"></div>
+  </div>
+
+  <div class="card">
     <div class="controls">
-      <div><label>Mode preset (CPOL, CPHA)</label>
-        <div class="row" id="presets"></div></div>
       <div><label>CPOL: clock idle level</label><select id="cpol"><option value="0">0 &mdash; idle low</option><option value="1">1 &mdash; idle high</option></select></div>
       <div><label>CPHA: sample on which edge</label><select id="cpha"><option value="0">0 &mdash; leading edge</option><option value="1">1 &mdash; trailing edge</option></select></div>
       <div><label>Bit order</label><select id="ord"><option value="1">MSB first</option><option value="0">LSB first</option></select></div>
-      <div><label>Master sends (hex)</label><input type="text" id="mb" value="A5" maxlength="2"></div>
-      <div><label>Slave sends (hex)</label><input type="text" id="sb" value="3C" maxlength="2"></div>
+      <div><label for="mb">Master sends (hex)</label><input type="text" id="mb" value="A5" maxlength="2"><div class="bits" id="mbits"></div></div>
+      <div><label for="sb">Slave sends (hex)</label><input type="text" id="sb" value="3C" maxlength="2"><div class="bits s" id="sbits"></div></div>
       <div><label><input type="checkbox" id="match" checked> Slave configured with the same mode</label>
         <div class="row" id="sbox" style="display:none;gap:8px">
           <select id="scpol"><option value="0">slave CPOL 0</option><option value="1">slave CPOL 1</option></select>
@@ -89,15 +113,16 @@ svg .m{fill:var(--muted)}
 
   <div class="card">
     <h2>Master &harr; slave</h2>
-    <div class="legend"><span><i style="background:var(--sigbg);border:1px solid var(--sig)"></i>bit not sent yet</span><span><i style="background:var(--okbg);border:1px solid var(--ok)"></i>bit received</span><span><i style="background:var(--badbg);border:1px solid var(--bad)"></i>read a floating line (?)</span><span><i style="border:2.5px solid var(--warn)"></i>bit currently on the wire</span></div>
-    <svg id="dg" viewBox="0 0 900 372"></svg>
+    <div class="legend"><span><i style="background:var(--sigbg);border:1px solid var(--sig)"></i>bit not sent yet</span><span><i style="background:var(--okbg);border:1px solid var(--ok)"></i>bit received</span><span><i style="background:var(--badbg);border:1px solid var(--bad)"></i>read a floating line (?)</span><span><i style="border:2.5px solid var(--warn)"></i>next bit out</span></div>
+    <svg id="dg" viewBox="0 0 900 400"></svg>
     <div class="row" style="margin:6px 0">
       <button id="rst">&#9198; Reset</button><button id="back">&#9664; Back</button>
       <button id="play" class="primary">&#9654; Play</button><button id="next">Next &#9654;</button>
-      <select id="spd" style="width:auto"><option value="1100">slow</option><option value="650" selected>normal</option><option value="250">fast</option></select>
+      <select id="spd" style="width:auto"><option value="1300">slow</option><option value="800" selected>normal</option><option value="320">fast</option></select>
       <span id="stepLbl" class="cap" style="margin:0 0 0 8px"></span>
     </div>
-    <input type="range" id="scrub" min="0" max="18" value="0">
+    <input type="range" id="scrub" min="0" max="18" value="0" aria-label="Step">
+    <p class="keys"><kbd>&rarr;</kbd> next edge &nbsp; <kbd>&larr;</kbd> back &nbsp; <kbd>Space</kbd> play / pause</p>
     <h2 id="evTitle" style="margin-top:10px"></h2>
     <ul class="log" id="evLog"></ul>
     <div class="res" id="res"></div>
@@ -105,8 +130,52 @@ svg .m{fill:var(--muted)}
 
   <div class="card">
     <h2>Timing diagram</h2>
-    <p class="cap">Dotted lines mark clock edges: <b style="color:var(--ok)">green</b> = the master samples here, <b style="color:var(--warn)">orange</b> = the master changes its output here. Diamonds show where a bit was actually read. The slave's data window (MISO) shifts when its mode differs.</p>
-    <canvas id="cw" height="320"></canvas>
+    <p class="cap">Follow the cursor. Each clock edge is either a <b style="color:var(--ok)">sample</b> or a <b style="color:var(--warn)">shift</b>, never both, so every bit sits stable on the wire for half a clock before and after it is read.</p>
+    <div class="legend"><span><i class="dot" style="background:var(--ok)"></i>edge where the master samples</span><span><i class="dot" style="background:var(--warn)"></i>edge where data is shifted / changed</span><span><i class="dia" style="background:var(--ok)"></i>bit actually read</span><span><i class="dia" style="background:var(--bad)"></i>read while floating (?)</span></div>
+    <canvas id="cw"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Why sample and shift on opposite edges?</h2>
+    <p class="cap">Both chips change their output and read their input off the same clock, but wires and gates add small, unpredictable delays. Splitting the two jobs gives the data a half-clock safety margin.</p>
+    <div class="two">
+      <figure>
+        <svg viewBox="0 0 420 160" role="img" aria-label="Data changes on one edge and is sampled on the opposite edge">
+          <text x="4" y="14" font-size="11" class="m">SCLK</text>
+          <path d="M10 50 H50 V22 H130 V50 H210 V22 H290 V50 H370" fill="none" stroke="var(--muted)" stroke-width="2.2"/>
+          <text x="4" y="86" font-size="11" class="m">DATA</text>
+          <rect x="130" y="96" width="160" height="40" fill="var(--okbg)"/>
+          <path d="M10 104 H124 L136 134 H284 L296 104 H370" fill="none" stroke="var(--sig)" stroke-width="2.4"/>
+          <path d="M210 18 V140" stroke="var(--ok)" stroke-width="1.4" stroke-dasharray="3 4"/>
+          <circle cx="210" cy="134" r="5" fill="var(--ok)"/>
+          <circle cx="130" cy="22" r="4.5" fill="var(--warn)"/><circle cx="290" cy="22" r="4.5" fill="var(--warn)"/>
+          <path d="M130 150 H210 M210 150 H290" stroke="var(--ok)" stroke-width="1.4" marker-start="none"/>
+          <text x="170" y="158" font-size="10" text-anchor="middle" class="m">&frac12; clock</text>
+          <text x="250" y="158" font-size="10" text-anchor="middle" class="m">&frac12; clock</text>
+          <text x="210" y="12" font-size="10" text-anchor="middle" style="fill:var(--ok)">sample</text>
+          <text x="130" y="12" font-size="10" text-anchor="middle" style="fill:var(--warn)">change</text>
+          <text x="290" y="12" font-size="10" text-anchor="middle" style="fill:var(--warn)">change</text>
+        </svg>
+        <figcaption><b style="color:var(--ok)">SPI:</b> data changes on one edge and is read on the other. At the moment of reading it has been steady for half a clock and stays steady for another half.</figcaption>
+      </figure>
+      <figure>
+        <svg viewBox="0 0 420 160" role="img" aria-label="Data changes at the same edge it is sampled on, so the value is uncertain">
+          <text x="4" y="14" font-size="11" class="m">SCLK</text>
+          <path d="M10 50 H50 V22 H130 V50 H210 V22 H290 V50 H370" fill="none" stroke="var(--muted)" stroke-width="2.2"/>
+          <text x="4" y="86" font-size="11" class="m">DATA</text>
+          <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="var(--bad)" opacity=".35"/></pattern></defs>
+          <rect x="190" y="96" width="40" height="40" fill="url(#hatch)" stroke="var(--bad)" stroke-dasharray="3 3"/>
+          <path d="M10 104 H204 L216 134 H284 L296 104 H370" fill="none" stroke="var(--sig)" stroke-width="2.4"/>
+          <path d="M210 18 V140" stroke="var(--bad)" stroke-width="1.4" stroke-dasharray="3 4"/>
+          <circle cx="210" cy="22" r="4.5" fill="var(--bad)"/>
+          <text x="210" y="12" font-size="10" text-anchor="middle" style="fill:var(--bad)">sample + change</text>
+          <text x="250" y="116" font-size="11" style="fill:var(--bad)">old bit? new bit?</text>
+          <text x="250" y="130" font-size="11" style="fill:var(--bad)">half-switched?</text>
+        </svg>
+        <figcaption><b style="color:var(--bad)">Same edge:</b> the sender's output is changing just as the receiver looks. Which value is read depends on tiny delays that differ per chip, wire length and temperature. It can work on your bench and fail on someone else's.</figcaption>
+      </figure>
+    </div>
+    <p class="cap" style="margin:10px 0 0">The speed is identical: one bit per clock cycle either way. Opposite edges only buy margin. Receivers need the input stable for a short <i>setup</i> time before the sampling edge and a <i>hold</i> time after it, and a half-clock gap makes both easy to meet.</p>
   </div>
 
   <div class="card">
@@ -120,13 +189,9 @@ const $ = id => document.getElementById(id);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const hx = b => b.toString(16).toUpperCase().padStart(2,'0');
 const bin = b => b.toString(2).padStart(8,'0');
+const WAVE_H = 336;
 
 const st = {cpol:0, cpha:0, msb:1, sCpol:0, sCpha:0, match:true, mB:0xA5, sB:0x3C, step:0, timer:null};
-
-[[0,0],[0,1],[1,0],[1,1]].forEach(([p,a],i)=>{
-  const b=document.createElement('button'); b.textContent='Mode '+i; b.dataset.m=i;
-  b.onclick=()=>{ $('cpol').value=p; $('cpha').value=a; readCfg(); }; $('presets').appendChild(b);
-});
 
 /* ---------- model ---------- */
 const cells = b => Array.from({length:8},(_,i)=>({v:(b>>(7-i))&1, t:'tx'}));
@@ -137,19 +202,20 @@ const mkDev = (byte,cpol,cpha,name) => ({name, R:cells(byte), cpha, cpol, sample
 function simulate(){
   const M = mkDev(st.mB, st.cpol, st.cpha, 'Master');
   const S = mkDev(st.sB, st.match?st.cpol:st.sCpol, st.match?st.cpha:st.sCpha, 'Slave');
-  const snaps=[], samples=[]; let cs=1, sclk=st.cpol;
+  const snaps=[], samples=[]; let cs=1, sclk=st.cpol, fl={M:{},S:{}};
+  const key = d => d===M?'M':'S';
   const wireOf = d => d===M?'MOSI':'MISO';
-  const drive = (d,step,log,why) => { const k=d.drives.length; d.line=outBit(d); d.drives.push({step, bit: st.msb?7-k:k}); log.push({w:d===M?'M':'S', t:`${d.name} ${why} bit ${d.drives[k].bit} (=${d.line}) on ${wireOf(d)}`}); };
-  const snap = (title,log) => snaps.push({title, log, cs, sclk, mosi:M.line, miso:S.line,
-    M:{R:M.R.map(c=>({...c})), latch:M.latch, line:M.line}, S:{R:S.R.map(c=>({...c})), latch:S.latch, line:S.line}});
+  const drive = (d,step,log,why) => { const k=d.drives.length; d.line=outBit(d); d.drives.push({step, bit: st.msb?7-k:k}); fl[key(d)].dr=true; log.push({w:key(d), t:`${d.name} ${why} bit ${d.drives[k].bit} (=${d.line}) on ${wireOf(d)}`}); };
+  const snap = (title,log) => { snaps.push({title, log, cs, sclk, mosi:M.line, miso:S.line, fl,
+    M:{R:M.R.map(c=>({...c})), latch:M.latch, line:M.line}, S:{R:S.R.map(c=>({...c})), latch:S.latch, line:S.line}}); fl={M:{},S:{}}; };
   const doShift = (d,step,log) => {
-    const lv = d.latch===null?'?':d.latch; d.R = shiftIn(d.R, lv); d.shifts++;
-    log.push({w:d===M?'M':'S', t:`${d.name} shifts its register: ${lv==='?'?'a floating ?':'received '+lv} enters`});
+    const lv = d.latch===null?'?':d.latch; d.R = shiftIn(d.R, lv); d.shifts++; fl[key(d)].sh=true;
+    log.push({w:key(d), t:`${d.name} shifts its register: ${lv==='?'?'a floating ?':'received '+lv} enters`});
   };
 
   snap('Idle: CS is high', [{w:'-',t:'Slave is deselected and ignores the bus. MISO is not driven (Z). The clock rests at its idle level (CPOL).'}]);
   const log1=[]; cs=0;
-  [M,S].forEach(d=>{ if(d.cpha===0) drive(d,1,log1,'puts first'); else log1.push({w:d===M?'M':'S', t:`${d.name} (CPHA=1) waits: its first bit appears on the first clock edge`}); });
+  [M,S].forEach(d=>{ if(d.cpha===0) drive(d,1,log1,'puts first'); else log1.push({w:key(d), t:`${d.name} (CPHA=1) waits: its first bit appears on the first clock edge`}); });
   snap('Master pulls CS low: the slave is selected', log1);
 
   for(let n=0;n<16;n++){
@@ -157,8 +223,8 @@ function simulate(){
     const mosiB=M.line, misoB=S.line; sclk = kind==='R'?1:0;
     const lead = n%2===0;
     [[M,misoB,'MISO'],[S,mosiB,'MOSI']].forEach(([d,val,wire])=>{
-      if(kind===d.sample){ d.latch = val===null?'?':val; samples.push({t:step, who:d===M?'M':'S', val:d.latch});
-        log.push({w:d===M?'M':'S', t:`${d.name} SAMPLES ${wire} → ${val===null?'? (line is floating!)':val}`}); }
+      if(kind===d.sample){ d.latch = val===null?'?':val; fl[key(d)].sa=true; samples.push({t:step, who:key(d), val:d.latch});
+        log.push({w:key(d), t:`${d.name} SAMPLES ${wire} → ${val===null?'? (line is floating!)':val}`}); }
     });
     [M,S].forEach(d=>{
       if(kind!==d.shiftK) return;
@@ -178,88 +244,174 @@ function simulate(){
 
 /* ---------- rendering ---------- */
 let sim=null;
-const T = s => s===18?19:s;      // step → time (clock half-periods)
+const T = s => s===18?19:s;      // step -> time (clock half-periods)
 
-function renderDiagram(sn){
-  const bx=(x,t,sub)=>`<rect class="box" x="${x}" y="10" width="330" height="352" rx="12"/><text x="${x+14}" y="34" font-size="16" font-weight="700">${t}</text><text class="m" x="${x+14}" y="52" font-size="11">${sub}</text>`;
-  let s=`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs>`;
-  s+=bx(20,'MASTER','e.g. STM32F446RE SPI1')+bx(570,'SLAVE','e.g. flash, sensor, display');
+function renderDiagram(sn, animate){
+  const MC=css('--sig'), SC=css('--sl'), MU=css('--muted'), WN=css('--warn'), OK=css('--ok');
+  const BX=[10,550], BW=340;
   const wires=[
-    {y:86, n:'SCLK', v:sn.sclk, dir:1, d:'clock: master only'},
-    {y:141,n:'MOSI', v:sn.mosi, dir:1, d:'master → slave'},
-    {y:196,n:'MISO', v:sn.miso, dir:-1,d:'slave → master'},
-    {y:251,n:'CS',   v:sn.cs,   dir:1, d:'low = selected'}];
-  wires.forEach(w=>{
-    const col = w.v===null?css('--muted'): (w.n==='CS'? (w.v===0?css('--warn'):css('--muted')) : (w.v===1?css('--sig'):css('--muted')));
-    const x1=w.dir>0?350:570, x2=w.dir>0?570:350;
-    s+=`<g style="color:${col}"><line x1="${x1}" y1="${w.y}" x2="${x2}" y2="${w.y}" stroke="${col}" stroke-width="${w.v===null?1.5:3.5}" ${w.v===null?'stroke-dasharray="5 5"':''} marker-end="url(#ar)"/></g>`;
-    s+=`<text x="460" y="${w.y-18}" text-anchor="middle" font-size="13" font-weight="700">${w.n}</text><text class="m" x="460" y="${w.y-5}" text-anchor="middle" font-size="10.5">${w.d}</text>`;
-    s+=`<rect x="445" y="${w.y+6}" width="30" height="20" rx="5" fill="var(--card)" stroke="${col}"/><text x="460" y="${w.y+20}" text-anchor="middle" font-size="13" font-weight="700" style="fill:${col}">${w.v===null?'Z':w.v}</text>`;
-  });
-  [[20,sn.M,'M'],[570,sn.S,'S']].forEach(([x0,dev,id])=>{
-    s+=`<text class="m" x="${x0+14}" y="${id==='M'?96:96}" font-size="10">${id==='M'?'drives SCLK, MOSI, CS':'drives MISO only'}</text>`;
-    s+=`<text class="m" x="${x0+14}" y="304" font-size="11">8-bit shift register</text>`;
-    const outIdx = st.msb?0:7;
-    dev.R.forEach((c,i)=>{
-      const cx=x0+14+i*38, cls=c.t==='tx'?'cell-tx':c.t==='rx'?'cell-rx':'cell-q', on = dev.line!==null && i===outIdx;
-      s+=`<rect class="${cls}" x="${cx}" y="312" width="34" height="34" rx="6" stroke-width="${on?3:1.5}" ${on?'style="stroke:var(--warn)"':''}/><text x="${cx+17}" y="334" text-anchor="middle" font-size="16" font-weight="700">${c.v}</text>`;
-      s+=`<text class="m" x="${cx+17}" y="360" text-anchor="middle" font-size="9">b${7-i}</text>`;
+    {y:90, n:'SCLK', v:sn.sclk, dir:1, d:'clock: master only', col:MC},
+    {y:145,n:'MOSI', v:sn.mosi, dir:1, d:'master → slave', col:MC},
+    {y:200,n:'MISO', v:sn.miso, dir:-1,d:'slave → master', col:SC},
+    {y:255,n:'CS',   v:sn.cs,   dir:1, d:'low = selected', col:MC}];
+  let s=`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="context-stroke"/></marker></defs>`;
+  const box=(x,t,sub,f)=>{
+    let chip='';
+    if(f.sa) chip+=`<text x="${x+BW-14}" y="34" text-anchor="end" font-size="12" font-weight="700" style="fill:${OK}">● SAMPLED</text>`;
+    if(f.sh) chip+=`<text x="${x+BW-14}" y="${f.sa?50:34}" text-anchor="end" font-size="12" font-weight="700" style="fill:${WN}">● SHIFTED</text>`;
+    return `<rect class="box" x="${x}" y="10" width="${BW}" height="382" rx="12"/><text x="${x+14}" y="34" font-size="16" font-weight="700">${t}</text><text class="m" x="${x+14}" y="52" font-size="11">${sub}</text>${chip}`;
+  };
+  s+=box(BX[0],'MASTER','e.g. STM32F446RE SPI1',sn.fl.M)+box(BX[1],'SLAVE','e.g. flash, sensor, display',sn.fl.S);
+
+  // register geometry
+  const cellX=(x0,i)=>x0+18+i*38, outIdx=st.msb?0:7, inIdx=st.msb?7:0;
+  const REGY=336, LATY=294;
+
+  // internal wiring: register out -> pin, pin -> latch
+  const lineCol=v=>v===null?MU:v===1?null:MU;
+  const inner=(d,x0,wy,col,v)=>{          // d: 'out' or 'in'
+    const c = v===null?MU:(v===1?col:MU), dash=v===null?'stroke-dasharray="4 4"':'';
+    if(d==='out'){ const ox=cellX(x0,outIdx)+17; const px = x0===BX[0]?x0+BW:x0;
+      return `<path d="M${ox} ${REGY} V${wy} H${px}" fill="none" stroke="${c}" stroke-width="2" ${dash} opacity=".75"/>`; }
+    const ix=cellX(x0,inIdx)+17, px = x0===BX[0]?x0+BW:x0;
+    return `<path d="M${px} ${wy} H${ix} V${LATY}" fill="none" stroke="${c}" stroke-width="2" ${dash} opacity=".75"/>`;
+  };
+  s+=inner('out',BX[0],wires[1].y,MC,sn.mosi)+inner('in',BX[0],wires[2].y,SC,sn.miso);
+  s+=inner('out',BX[1],wires[2].y,SC,sn.miso)+inner('in',BX[1],wires[1].y,MC,sn.mosi);
+
+  // internal stubs for SCLK and CS + pin labels
+  [[BX[0],true],[BX[1],false]].forEach(([x0,isM])=>{
+    const sx = isM? x0+BW-60 : x0, ex = isM? x0+BW : x0+60;
+    [0,3].forEach(i=>{ const w=wires[i];
+      const c = w.v===null?MU: (w.n==='CS'? (w.v===0?MC:MU) : (w.v===1?MC:MU));
+      s+=`<line x1="${sx}" y1="${w.y}" x2="${ex}" y2="${w.y}" stroke="${c}" stroke-width="2.5"/>`;
     });
-    s+=`<text class="m" x="${x0+314}" y="304" text-anchor="end" font-size="11">input latch: ${dev.latch===null?'—':dev.latch}</text>`;
+    const tx = isM? x0+BW-10 : x0+10, an = isM?'end':'start';
+    wires.forEach(w=>{ const lab = isM? (w.n==='CS'?'CS out':w.n==='MISO'?'MISO in':w.n+' out') : (w.n==='MOSI'?'MOSI in':w.n==='MISO'?'MISO out':w.n+' in');
+      s+=`<text class="m" x="${tx}" y="${w.y-8}" text-anchor="${an}" font-size="10.5">${lab}</text>`; });
+  });
+
+  // bus wires between chips
+  wires.forEach(w=>{
+    const col = w.v===null?MU: (w.n==='CS'? (w.v===0?w.col:MU) : (w.v===1?w.col:MU));
+    const x1=w.dir>0?350:550, x2=w.dir>0?546:354;
+    s+=`<line x1="${x1}" y1="${w.y}" x2="${x2}" y2="${w.y}" stroke="${col}" stroke-width="${w.v===null?1.5:3.5}" ${w.v===null?'stroke-dasharray="5 5"':''} marker-end="url(#ar)" style="color:${col}"/>`;
+    s+=`<text x="450" y="${w.y-18}" text-anchor="middle" font-size="13" font-weight="700" style="fill:${w.n==='MISO'?SC:MC}">${w.n}</text><text class="m" x="450" y="${w.y-6}" text-anchor="middle" font-size="9.5">${w.d}</text>`;
+    const label = w.n==='CS' ? (w.v===0?'LOW':'HIGH') : (w.v===null?'Z':w.v);
+    s+=`<rect x="${w.n==='CS'?430:435}" y="${w.y+6}" width="${w.n==='CS'?40:30}" height="20" rx="5" fill="var(--card)" stroke="${col}"/><text x="450" y="${w.y+20}" text-anchor="middle" font-size="13" font-weight="700" style="fill:${col}">${label}</text>`;
+  });
+
+  // travelling bit
+  if(animate){
+    const dur = Math.min(.6, +$('spd').value/1000*.7);
+    [['M',wires[1],sn.mosi,MC],['S',wires[2],sn.miso,SC]].forEach(([id,w,v,col])=>{
+      if(!sn.fl[id].dr || v===null) return;
+      const from=w.dir>0?350:550, dx=w.dir>0?200:-200;
+      s+=`<g class="dot" style="--dx:${dx}px;--dur:${dur}s"><circle cx="${from}" cy="${w.y}" r="11" fill="${col}"/><text x="${from}" y="${w.y+5}" text-anchor="middle" font-size="14" font-weight="700" style="fill:#fff">${v}</text></g>`;
+    });
+  }
+
+  // registers + latches
+  [[BX[0],sn.M,'M',sn.fl.M],[BX[1],sn.S,'S',sn.fl.S]].forEach(([x0,dev,id,f])=>{
+    const outIdxN=st.msb?0:7, enterIdx=st.msb?7:0;
+    s+=`<text class="m" x="${x0+14}" y="${REGY-12}" font-size="11">8-bit shift register</text>`;
+    s+=`<text class="m" x="${cellX(x0,outIdxN)+17}" y="${REGY+54}" text-anchor="middle" font-size="9.5">OUT</text>`;
+    s+=`<text class="m" x="${cellX(x0,enterIdx)+17}" y="${REGY+54}" text-anchor="middle" font-size="9.5">IN</text>`;
+    dev.R.forEach((c,i)=>{
+      const cx=cellX(x0,i), cls=c.t==='tx'?'cell-tx':c.t==='rx'?'cell-rx':'cell-q', on = dev.line!==null && i===outIdxN;
+      const fresh = animate && f.sh && i===enterIdx;
+      s+=`<rect class="${cls}${fresh?' flash':''}" x="${cx}" y="${REGY}" width="34" height="34" rx="6" stroke-width="${on?3:1.5}" ${on?'style="stroke:var(--warn)"':''}/><text x="${cx+17}" y="${REGY+23}" text-anchor="middle" font-size="16" font-weight="700">${c.v}</text>`;
+      s+=`<text class="m" x="${cx+17}" y="${REGY+48}" text-anchor="middle" font-size="9">b${7-i}</text>`;
+    });
+    // input latch
+    const lx=cellX(x0,enterIdx), lv=dev.latch, lc=lv==='?'?css('--bad'):(f.sa?OK:MU);
+    s+=`<rect x="${lx}" y="${LATY}" width="34" height="24" rx="5" fill="var(--card)" stroke="${lc}" stroke-width="${f.sa?2.5:1.2}"/><text x="${lx+17}" y="${LATY+17}" text-anchor="middle" font-size="13" font-weight="700" style="fill:${lc}">${lv===null?'–':lv}</text>`;
+    s+=`<text class="m" x="${lx+(st.msb?-6:40)}" y="${LATY+16}" text-anchor="${st.msb?'end':'start'}" font-size="10">input latch</text>`;
+    s+=`<path d="M${lx+17} ${LATY+24} V${REGY}" stroke="${MU}" stroke-width="1.5" marker-end="url(#ar)" style="color:${MU}"/>`;
   });
   $('dg').innerHTML=s;
 }
 
 function drawWave(){
-  const c=$('cw'), dpr=window.devicePixelRatio||1, w=c.clientWidth, h=+c.getAttribute('height');
-  c.width=w*dpr; c.height=h*dpr; const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
-  const total=21, padL=96, padR=10, W=w-padL-padR, X=t=>padL+t/total*W, LH=76;
-  const lanes=[{k:'cs',l:'CS',s:'active low'},{k:'sclk',l:'SCLK'},{k:'mosi',l:'MOSI'},{k:'miso',l:'MISO'}];
-  const yv=(i,v)=> v===null? 8+i*LH+LH/2-4 : 8+i*LH+(v?16:LH-30);
-  g.font='12px ui-monospace,Menlo,monospace'; g.textBaseline='middle';
-  // edge guides
-  for(let n=0;n<16;n++){
-    const kind=(n%2===0)===(st.cpol===0)?'R':'F', t=2+n, isS = kind===sim.M.sample;
-    g.strokeStyle=isS?css('--ok'):css('--warn'); g.globalAlpha=.45; g.setLineDash([2,4]);
-    g.beginPath(); g.moveTo(X(t),4); g.lineTo(X(t),h-4); g.stroke();
-  }
-  g.setLineDash([]); g.globalAlpha=1;
+  const c=$('cw'), dpr=window.devicePixelRatio||1, w=c.clientWidth, h=WAVE_H;
+  if(!w||!sim) return;
+  c.style.height=h+'px'; c.width=Math.round(w*dpr); c.height=Math.round(h*dpr);
+  const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  const total=21, padL=112, padR=12, W=w-padL-padR, X=t=>padL+t/total*W, y0=32, LH=74;
+  const MC=css('--sig'), SC=css('--sl'), OK=css('--ok'), WN=css('--warn'), BAD=css('--bad'), MU=css('--muted'), FG=css('--fg');
+  const lanes=[{k:'cs',l:'CS',s:'active low',col:MC},{k:'sclk',l:'SCLK',s:'idle '+(st.cpol?'HIGH':'LOW'),col:MC},{k:'mosi',l:'MOSI',s:'master → slave',col:MC},{k:'miso',l:'MISO',s:'slave → master',col:SC}];
+  const cyOf=i=>y0+i*LH+LH/2, yv=(i,v)=> v===null? cyOf(i) : cyOf(i)+(v?-17:17);
+  const cur=X(T(st.step)), nextT=st.step<18?T(st.step+1):total;
+  g.textBaseline='middle';
+
+  // current half-cycle band
+  g.fillStyle=css('--sigbg'); g.fillRect(cur, y0-6, X(nextT)-cur, 4*LH+6);
+
+  // lane labels + dividers
   lanes.forEach((L,i)=>{
-    g.fillStyle=css('--fg'); g.textAlign='left'; g.fillText(L.l,8,8+i*LH+LH/2-8); if(L.s){g.fillStyle=css('--muted'); g.font='10px ui-monospace,monospace'; g.fillText(L.s,8,8+i*LH+LH/2+8); g.font='12px ui-monospace,Menlo,monospace';}
-    g.strokeStyle=css('--grid'); g.beginPath(); g.moveTo(padL,8+(i+1)*LH-4); g.lineTo(w-padR,8+(i+1)*LH-4); g.stroke();
+    g.textAlign='left'; g.fillStyle=L.col; g.font='700 13px ui-monospace,Menlo,monospace'; g.fillText(L.l,8,cyOf(i)-8);
+    g.fillStyle=MU; g.font='10px ui-monospace,Menlo,monospace'; g.fillText(L.s,8,cyOf(i)+8);
+    g.strokeStyle=css('--grid'); g.lineWidth=1; g.setLineDash([]); g.beginPath(); g.moveTo(padL,y0+(i+1)*LH); g.lineTo(w-padR,y0+(i+1)*LH); g.stroke();
   });
-  const path = (clipX)=>{
-    lanes.forEach((L,i)=>{
-      g.save(); if(clipX!==null){ g.beginPath(); g.rect(0,0,clipX,h); g.clip(); }
-      g.strokeStyle=css('--sig'); g.lineWidth=2.4; let prevY=null;
-      sim.snaps.forEach((sn,si)=>{
-        const v=sn[L.k], y=yv(i,v), t0=T(si), t1=si<18?T(si+1):total;
-        g.setLineDash(v===null?[4,4]:[]); g.globalAlpha=v===null?.5:1;
-        if(prevY!==null && prevY!==y){ g.setLineDash([]); g.beginPath(); g.moveTo(X(t0),prevY); g.lineTo(X(t0),y); g.stroke(); g.setLineDash(v===null?[4,4]:[]); }
-        g.beginPath(); g.moveTo(X(t0),y); g.lineTo(X(t1),y); g.stroke(); prevY=y;
-      });
-      g.restore();
+
+  // idle level guide on the clock lane
+  g.strokeStyle=MU; g.globalAlpha=.35; g.setLineDash([2,4]); g.lineWidth=1;
+  g.beginPath(); g.moveTo(padL,yv(1,st.cpol)); g.lineTo(w-padR,yv(1,st.cpol)); g.stroke(); g.setLineDash([]); g.globalAlpha=1;
+
+  // edge guides + markers (master's view: green = sample, orange = shift)
+  for(let n=0;n<16;n++){
+    const kind=(n%2===0)===(st.cpol===0)?'R':'F', t=2+n, isS=kind===sim.M.sample, col=isS?OK:WN;
+    g.strokeStyle=col; g.globalAlpha=.4; g.setLineDash([2,4]); g.lineWidth=1;
+    g.beginPath(); g.moveTo(X(t),y0); g.lineTo(X(t),y0+4*LH); g.stroke();
+    g.setLineDash([]); g.globalAlpha=t<=st.step?1:.4; g.fillStyle=col;
+    g.beginPath(); g.arc(X(t),cyOf(1)-31,4,0,7); g.fill();
+  }
+  g.globalAlpha=1;
+
+  // bit index labels along the top (the bit the master reads at each sample)
+  g.font='11px ui-monospace,Menlo,monospace'; g.textAlign='center'; g.fillStyle=MU;
+  sim.samples.filter(sm=>sm.who==='M').forEach((sm,k)=>{ g.fillText('b'+(st.msb?7-k:k), X(sm.t), 14); });
+  g.textAlign='left'; g.fillText('master reads →',padL-104,14);
+
+  // lane traces
+  const segs=lanes.map(L=>{ const out=[]; sim.snaps.forEach((sn,si)=>{ const v=sn[L.k], t0=T(si), t1=si<18?T(si+1):total, last=out[out.length-1];
+      if(last&&last.v===v) last.t1=t1; else out.push({t0,t1,v}); }); return out; });
+  const trace=(alpha,clipX)=>{
+    g.save(); if(clipX!==null){ g.beginPath(); g.rect(0,0,clipX,h); g.clip(); }
+    g.globalAlpha=alpha;
+    lanes.forEach((L,i)=>{ g.strokeStyle=L.col; let prevY=null;
+      segs[i].forEach(sg=>{ const y=yv(i,sg.v);
+        g.lineWidth=sg.v===null?1.6:2.6;
+        if(prevY!==null && prevY!==y){ g.setLineDash([]); g.beginPath(); g.moveTo(X(sg.t0),prevY); g.lineTo(X(sg.t0),y); g.stroke(); }
+        g.setLineDash(sg.v===null?[4,4]:[]); g.beginPath(); g.moveTo(X(sg.t0),y); g.lineTo(X(sg.t1),y); g.stroke(); prevY=y; });
     });
+    g.restore();
   };
-  g.globalAlpha=.22; path(null); g.globalAlpha=1; const cur=X(T(st.step))+1; path(cur);
-  // bit labels
-  g.font='11px ui-monospace,monospace'; g.textAlign='center'; g.fillStyle=css('--muted');
-  [[sim.M,2],[sim.S,3]].forEach(([d,li])=>d.drives.forEach((dr,k)=>{
-    if(T(dr.step)>T(st.step)) return;
-    const nxt=d.drives[k+1], t0=T(dr.step), t1=nxt?T(nxt.step):19;
-    g.fillText('b'+dr.bit, X((t0+t1)/2), 8+li*LH+6);
+  trace(.22,null); trace(1,cur+1);
+
+  // bit values inside each data window
+  [[sim.M,2,MC],[sim.S,3,SC]].forEach(([d,li,col])=>d.drives.forEach((dr,k)=>{
+    const nxt=d.drives[k+1], t0=T(dr.step), t1=nxt?T(nxt.step):19, shown=t0<=T(st.step);
+    const val = (d===sim.M? st.mB : st.sB) >> dr.bit & 1;
+    g.globalAlpha=shown?1:.3; g.textAlign='center'; g.fillStyle=col;
+    g.font='700 14px ui-monospace,Menlo,monospace'; g.fillText(val, X((t0+t1)/2), cyOf(li)-3);
+    g.font='9.5px ui-monospace,Menlo,monospace'; g.fillStyle=MU; g.fillText('b'+dr.bit, X((t0+t1)/2), cyOf(li)+9);
+    g.globalAlpha=1;
   }));
-  // sample diamonds
+
+  // sample diamonds (where a bit was really read)
   sim.samples.forEach(sm=>{ if(sm.t>st.step) return;
-    const li=sm.who==='M'?3:2, v=sm.val, y= v==='?'?yv(li,null):yv(li,v), x=X(sm.t);
-    g.fillStyle = v==='?'?css('--bad'):css('--ok'); g.beginPath(); g.moveTo(x,y-7); g.lineTo(x+6,y); g.lineTo(x,y+7); g.lineTo(x-6,y); g.fill();
+    const li=sm.who==='M'?3:2, v=sm.val, y=yv(li,v==='?'?null:v), x=X(sm.t);
+    g.fillStyle = v==='?'?BAD:OK; g.beginPath(); g.moveTo(x,y-7); g.lineTo(x+6,y); g.lineTo(x,y+7); g.lineTo(x-6,y); g.fill();
   });
-  g.strokeStyle=css('--fg'); g.lineWidth=1.2; g.setLineDash([6,4]); g.beginPath(); g.moveTo(cur,2); g.lineTo(cur,h-2); g.stroke(); g.setLineDash([]);
+
+  // playhead
+  g.strokeStyle=FG; g.lineWidth=1.4; g.setLineDash([6,4]); g.beginPath(); g.moveTo(cur,y0-8); g.lineTo(cur,y0+4*LH+2); g.stroke(); g.setLineDash([]);
 }
 
-function render(){
+function render(animate){
   const sn=sim.snaps[st.step];
-  renderDiagram(sn); drawWave();
+  renderDiagram(sn, !!animate); drawWave();
   $('stepLbl').textContent=`step ${st.step} / 18`; $('scrub').value=st.step;
   $('evTitle').textContent=sn.title;
   $('evLog').innerHTML=sn.log.map(l=>`<li>${l.w==='-'?'':`<span class="who ${l.w}">${l.w==='M'?'Master':'Slave'}</span>`}${l.t.replace(/^(Master|Slave) /,'')}</li>`).join('');
@@ -269,35 +421,89 @@ function render(){
     : `<span>Master will send 0x${hx(st.mB)} (${bin(st.mB)}) &nbsp;|&nbsp; Slave will send 0x${hx(st.sB)} (${bin(st.sB)})</span>`;
 }
 
+/* ---------- mode cards (mini timing diagrams) ---------- */
+function miniMode(cpol,cpha){
+  const W=230,H=128,sc=(W-20)/7.4, X=t=>10+t*sc;
+  const cl=(v)=>v?20:48, dl=(v)=>v?82:110, mid=96, END=7.4;
+  let clk=`M${X(0)} ${cl(cpol)}`, lv=cpol;
+  for(let e=1;e<=6;e++){ lv=1-lv; clk+=` H${X(e)} V${cl(lv)}`; } clk+=` H${X(END)}`;
+  const td=k=>cpha?1+2*k:(k?2*k:0.4), ts=k=>cpha?2+2*k:1+2*k, val=[1,0,1,0];
+  let d=`M${X(td(0)-.12)} ${mid}`;
+  for(let k=0;k<4;k++){ if(td(k)>=END) break; if(k) d+=` H${X(td(k)-.12)}`; d+=` L${X(td(k)+.12)} ${dl(val[k])}`; }
+  d+=` H${X(END)}`;
+  let marks='', guides='';
+  for(let e=1;e<=6;e++){ const lvl=cpol^(e%2), isS=cpha?e%2===0:e%2===1;
+    marks+=`<circle cx="${X(e)}" cy="${cl(lvl)-(lvl?-0:0)}" r="0"/>`;
+    guides+=`<path d="M${X(e)} 16 V114" stroke="${isS?'var(--ok)':'var(--warn)'}" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>`;
+    marks+=`<circle cx="${X(e)}" cy="12" r="3.6" fill="${isS?'var(--ok)':'var(--warn)'}"/>`; }
+  let dots='';
+  for(let k=0;k<3;k++) dots+=`<path d="M${X(ts(k))} ${dl(val[k])-6} l5 6 l-5 6 l-5 -6z" fill="var(--ok)"/>`;
+  const undef = cpha ? `<path d="M${X(0)} ${mid} H${X(td(0)-.12)}" stroke="var(--sig)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity=".6"/>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${guides}<path d="${clk}" fill="none" stroke="var(--muted)" stroke-width="2"/>${undef}<path d="${d}" fill="none" stroke="var(--sig)" stroke-width="2.2"/>${dots}${marks}</svg>`;
+}
+function buildModes(){
+  const host=$('modes');
+  for(let m=0;m<4;m++){
+    const p=m>>1, a=m&1, rise=p===a;
+    const b=document.createElement('button'); b.dataset.m=m;
+    b.innerHTML=`${miniMode(p,a)}<b>Mode ${m}</b> <small>CPOL ${p} · CPHA ${a}</small><span>idle ${p?'high':'low'} · read on ${rise?'rising ↑':'falling ↓'} · shift on ${rise?'falling ↓':'rising ↑'}</span>`;
+    b.onclick=()=>{ $('cpol').value=p; $('cpha').value=a; readCfg(); };
+    host.appendChild(b);
+  }
+}
+
 function info(){
   const lead = st.cpol===0?'rising':'falling', trail = st.cpol===0?'falling':'rising';
   const sEdge = st.cpha===0?lead:trail, cEdge = st.cpha===0?trail:lead;
   const mode = st.cpol*2+st.cpha;
-  $('modeInfo').innerHTML = `<b>Mode ${mode}</b> &mdash; clock idles <b>${st.cpol?'high':'low'}</b>. The first (leading) edge is ${lead}, the second (trailing) is ${trail}. `
+  let t = `<b>Mode ${mode}</b> &mdash; clock idles <b>${st.cpol?'high':'low'}</b>. The first (leading) edge is ${lead}, the second (trailing) is ${trail}. `
    +`Data is <b style="color:var(--ok)">sampled on the ${sEdge} edge</b> and <b style="color:var(--warn)">changed on the ${cEdge} edge</b>. `
    +(st.cpha===0?'The first bit must already be on the wire before the first edge, because that edge reads it.':'The first edge only puts the first bit out; the second edge reads it.');
-  document.querySelectorAll('#presets button').forEach(b=>b.classList.toggle('on',+b.dataset.m===mode));
+  if(!st.match){ const sm=st.sCpol*2+st.sCpha; t+=` <b style="color:var(--bad)">The slave is set to Mode ${sm}</b>, so it reads and shifts on different edges than the master expects.`; }
+  $('modeInfo').innerHTML = t;
+  document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',+b.dataset.m===mode));
+}
+
+function bitButtons(host, getByte, setByte){
+  host.innerHTML='';
+  for(let i=7;i>=0;i--){
+    const b=document.createElement('button'), on=(getByte()>>i)&1;
+    b.textContent=on; b.className=on?'one':''; b.title='bit '+i; b.setAttribute('aria-label','bit '+i);
+    b.onclick=()=>setByte(getByte()^(1<<i)); host.appendChild(b);
+  }
 }
 
 function readCfg(){
+  const clean=el=>{ const v=el.value.replace(/[^0-9a-f]/gi,'').toUpperCase(); if(v!==el.value) el.value=v; };
+  clean($('mb')); clean($('sb'));
   st.cpol=+$('cpol').value; st.cpha=+$('cpha').value; st.msb=+$('ord').value;
   st.mB=(parseInt($('mb').value,16)||0)&255; st.sB=(parseInt($('sb').value,16)||0)&255;
   st.match=$('match').checked; $('sbox').style.display=st.match?'none':'flex';
   st.sCpol=+$('scpol').value; st.sCpha=+$('scpha').value;
-  info(); sim=simulate(); render();
+  bitButtons($('mbits'),()=>st.mB,v=>{ $('mb').value=hx(v); readCfg(); });
+  bitButtons($('sbits'),()=>st.sB,v=>{ $('sb').value=hx(v); readCfg(); });
+  info(); sim=simulate(); render(false);
 }
 ['cpol','cpha','ord','mb','sb','match','scpol','scpha'].forEach(id=>$(id).addEventListener('input',readCfg));
 
-const go = s => { st.step=Math.max(0,Math.min(18,s)); render(); };
+const go = (s,animate) => { const n=Math.max(0,Math.min(18,s)); animate = animate && n===st.step+1; st.step=n; render(animate); };
 const stop = () => { clearInterval(st.timer); st.timer=null; $('play').innerHTML='&#9654; Play'; };
-const start = () => { if(st.step>=18) st.step=0; $('play').innerHTML='&#10074;&#10074; Pause'; render();
-  st.timer=setInterval(()=>{ if(st.step>=18){ stop(); return; } go(st.step+1); }, +$('spd').value); };
+const start = () => { if(st.step>=18) st.step=0; $('play').innerHTML='&#10074;&#10074; Pause'; render(false);
+  st.timer=setInterval(()=>{ if(st.step>=18){ stop(); return; } go(st.step+1,true); }, +$('spd').value); };
 $('play').onclick=()=>st.timer?stop():start();
 $('spd').onchange=()=>{ if(st.timer){ stop(); start(); } };
-$('next').onclick=()=>{stop();go(st.step+1)}; $('back').onclick=()=>{stop();go(st.step-1)};
-$('rst').onclick=()=>{stop();go(0)}; $('scrub').oninput=e=>{stop();go(+e.target.value)};
-addEventListener('resize',render);
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+$('next').onclick=()=>{stop();go(st.step+1,true)}; $('back').onclick=()=>{stop();go(st.step-1,false)};
+$('rst').onclick=()=>{stop();go(0,false)}; $('scrub').oninput=e=>{stop();go(+e.target.value,false)};
+addEventListener('keydown',e=>{
+  if(/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type!=='range') return;
+  if(e.key==='ArrowRight'){ e.preventDefault(); stop(); go(st.step+1,true); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); stop(); go(st.step-1,false); }
+  else if(e.key===' ' && e.target.tagName!=='BUTTON'){ e.preventDefault(); st.timer?stop():start(); }
+});
+addEventListener('resize',()=>render(false));
+if(window.ResizeObserver) new ResizeObserver(()=>drawWave()).observe($('cw').parentElement);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>render(false));
+buildModes();
 readCfg();
 </script>
 </body>
