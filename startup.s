@@ -28,10 +28,12 @@
 .word Default_Handler        /* 0x38  PendSV                 */
 .word SysTick_Handler        /* 0x3C  SysTick (exception 15) */
 
-/* EXTI lines 10..15 share one vector: IRQ 40 -> exception 56. */
-.rept 40                     /* 0x40..0xDC  IRQ 0..39 (unused, default) */
+/* Peripheral IRQs: exception number = IRQ + 16, so IRQ n lives at 0x40 + 4n. */
+.rept 38                     /* 0x40..0xD4  IRQ 0..37 (no handler yet) */
 .word Default_Handler
 .endr
+.word USART2_IRQHandler      /* 0xD8  USART2 (IRQ 38) */
+.word Default_Handler        /* 0xDC  IRQ 39 (no handler yet) */
 .word EXTI15_10_IRQHandler   /* 0xE0  EXTI15_10 (IRQ 40) */
 
 .section .text.Reset_Handler, "ax", %progbits
@@ -80,6 +82,9 @@ Default_Handler:
 .weak SysTick_Handler
 .thumb_set SysTick_Handler, Default_Handler
 
-/* Same weak-default trick for EXTI15_10 (IRQ 40). */
+/* Same weak-default trick for EXTI15_10 (IRQ 40) and USART2 (IRQ 38). */
 .weak EXTI15_10_IRQHandler
 .thumb_set EXTI15_10_IRQHandler, Default_Handler
+
+.weak USART2_IRQHandler
+.thumb_set USART2_IRQHandler, Default_Handler
