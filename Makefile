@@ -23,7 +23,7 @@ LDFLAGS := $(CPUFLAGS) -T linker.ld -nostdlib -Wl,--gc-sections
 PROGRAMS := $(notdir $(basename $(wildcard programs/*.c)))
 EXAMPLES := $(notdir $(basename $(wildcard examples/*.c)))
 
-.PHONY: all programs flash clean examples example program $(PROGRAMS)
+.PHONY: all programs flash monitor clean examples example program $(PROGRAMS)
 
 all: programs
 
@@ -48,6 +48,14 @@ flash:
 	@$(MAKE) --no-print-directory program P=$(PROGRAM)
 	probe-rs download --chip STM32F446RE --protocol swd --verify --reset \
 		$(BUILD)/$(PROGRAM)/$(PROGRAM).elf
+
+# Open the board's UART console (ST-LINK virtual COM port) at 115200 baud.
+# Auto-detects /dev/tty.usbmodem*; override with: make monitor MONITOR_PORT=/dev/...
+# Quit tio with Ctrl-t then q.
+MONITOR_PORT ?= $(firstword $(wildcard /dev/tty.usbmodem*))
+monitor:
+	@test -n "$(MONITOR_PORT)" || { echo "no /dev/tty.usbmodem* found: is the Nucleo plugged in?"; exit 1; }
+	tio -b 115200 $(MONITOR_PORT)
 
 # Generate assembly for one example at every -O level: make example NAME=regs
 example: example-$(NAME)

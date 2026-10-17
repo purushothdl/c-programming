@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLI Print and Parse Stepper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EEF0; --panel:#F7FAFB; --ink:#1B2A33; --muted:#566872; --line:#B4C1C8; --soft:#D9E2E6;
+  --step:#1F6E99; --step-tint:#D6E9F4;   /* a normal step */
+  --out:#0E7C66; --out-tint:#CFEBE3;     /* something is sent or stored */
+  --bad:#B3261E; --bad-tint:#F6DAD7;     /* a check fails */
+  --acc:#7A2E8E; --acc-tint:#EBDDF1;
+  --ui:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F171C; --panel:#162229; --ink:#E3ECF0; --muted:#8FA2AD; --line:#33454E; --soft:#223038;
+    --step:#7CC4EE; --step-tint:#153448; --out:#5FD3B8; --out-tint:#12392F;
+    --bad:#FF8A80; --bad-tint:#4A2321; --acc:#D79BEA; --acc-tint:#3A2445;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--ui);font-variant-ligatures:none}
+.wrap{max-width:1200px;margin:0 auto;padding:34px 20px 72px}
+h1{font-size:clamp(28px,4.6vw,48px);line-height:1.05;letter-spacing:-.025em;font-weight:800;margin:0 0 14px;max-width:22ch}
+h2{font-size:clamp(19px,2.4vw,24px);letter-spacing:-.015em;font-weight:700;margin:0 0 8px}
+p{margin:0 0 12px}
+.lead{font-size:18px;max-width:66ch;color:var(--muted);margin-bottom:22px}
+code,.mono{font-family:var(--mono);font-size:.9em}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px;border-radius:4px}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.tab{font:700 15px var(--ui);padding:9px 16px;border-radius:11px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.tab:hover{border-color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 22px;margin:0 0 16px}
+.why div{border-left:4px solid var(--line);padding:2px 0 2px 12px}
+.why b{display:block;font-size:14px;margin-bottom:2px}
+.why span{font-size:14.5px;color:var(--muted)}
+.why code{color:var(--ink)}
+.setup{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;margin-bottom:14px;padding:12px 14px;background:var(--bg);border-radius:12px}
+.setup label,.setup .lab{font-weight:700;font-size:14px}
+.setup input[type=text]{font:700 16px var(--mono);padding:7px 10px;border:1.5px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);width:190px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.tbtn{font:600 14px var(--ui);padding:7px 12px;border-radius:9px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.seg button:hover,.tbtn:hover{border-color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg button.bad{border-color:var(--bad);color:var(--bad)}
+.err{color:var(--bad);font-size:13px;font-weight:600}
+
+.transport{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin:2px 0 8px}
+.tbtn.big{padding:9px 16px;font-size:15px}
+.tbtn[disabled]{opacity:.4;cursor:default}
+.tbtn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.stepno{font:700 15px var(--mono);margin-left:6px}
+.spd{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-left:auto}
+.spd input{width:110px;accent-color:var(--acc)}
+.scrub{width:100%;accent-color:var(--step);margin:2px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:14px}
+.chip{width:22px;height:22px;border-radius:5px;border:1.5px solid var(--line);background:var(--bg);padding:0;cursor:pointer;font:600 10px var(--mono);color:var(--muted)}
+.chip.k-step{background:var(--step-tint);border-color:var(--step)}
+.chip.k-out{background:var(--out-tint);border-color:var(--out)}
+.chip.k-bad{background:var(--bad-tint);border-color:var(--bad)}
+.chip.cur{outline:3px solid var(--ink);outline-offset:1px;color:var(--ink)}
+.chipkey{font-size:12.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin:-8px 0 14px}
+.chipkey i{display:inline-block;width:11px;height:11px;border-radius:3px;border:1.5px solid;margin-right:5px;vertical-align:-1px}
+
+.viz{border:1.5px solid var(--line);border-radius:14px;background:var(--bg);padding:14px;min-height:240px}
+.row{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-bottom:10px}
+.k{font:700 13px var(--ui);color:var(--muted);min-width:70px}
+.big{font:800 26px var(--mono)}
+.out{font:800 24px var(--mono);letter-spacing:.04em;overflow-wrap:anywhere;min-height:36px}
+.out::after{content:"";display:inline-block;width:10px;height:22px;background:var(--ink);vertical-align:-3px;margin-left:3px;opacity:.5}
+.sub{font-size:13px;color:var(--muted)}
+
+.nibs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+.nib{border:1.5px solid var(--line);border-radius:10px;padding:4px 6px 6px;text-align:center;background:var(--panel);transition:background .2s,border-color .2s}
+.nib .b{display:flex;gap:2px;justify-content:center;font:700 17px var(--mono)}
+.nib .b span{width:15px}
+.nib .d{font:800 20px var(--mono);height:28px;line-height:28px;color:var(--out)}
+.nib .r{font:600 10.5px var(--mono);color:var(--muted)}
+.nib.cur{border-color:var(--step);background:var(--step-tint)}
+.nib.done{border-color:var(--out)}
+.calc{font:700 16px var(--mono);margin:6px 0 10px;overflow-wrap:anywhere}
+.calc em{font-style:normal;color:var(--step)}
+.calc strong{color:var(--out)}
+.digs{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 12px}
+.dig{width:38px;border:1.5px solid var(--line);border-radius:8px;text-align:center;background:var(--panel);transition:background .2s,border-color .2s}
+.dig .i{font:600 11px var(--mono);color:var(--muted)}
+.dig .c{font:800 18px var(--mono)}
+.dig.hit{border-color:var(--out);background:var(--out-tint)}
+.dig.idx{border-color:var(--step);background:var(--step-tint)}
+
+.cells{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 12px}
+.cell{min-width:44px;border:1.5px dashed var(--line);border-radius:9px;text-align:center;background:var(--panel);padding:2px 4px 3px}
+.cell .i{font:600 11px var(--mono);color:var(--muted)}
+.cell .c{font:800 20px var(--mono);height:28px;line-height:28px}
+.cell .p{font:700 11px var(--ui);height:16px;color:var(--acc)}
+.cell.on{border-style:solid;border-color:var(--out);background:var(--out-tint)}
+.cell.hot{border-color:var(--step);background:var(--step-tint)}
+.cell.bad{border-color:var(--bad);background:var(--bad-tint)}
+.cell.read{outline:3px solid var(--step);outline-offset:1px}
+
+.vars{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px}
+.var{border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--panel);min-width:96px}
+.var .t{font:600 12px var(--ui);color:var(--muted)}
+.var .v{font:800 20px var(--mono)}
+.var .h{font:600 12px var(--mono);color:var(--muted)}
+.var.hot{border-color:var(--step);background:var(--step-tint)}
+.checks{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px}
+.chk{border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--panel);font-size:14px;max-width:340px}
+.chk .t{font-weight:700;font-size:13px;display:block}
+.chk .n{font:600 13px var(--mono)}
+.chk.ok{border-color:var(--out);background:var(--out-tint)}
+.chk.no{border-color:var(--bad);background:var(--bad-tint)}
+.chk.idle{opacity:.5}
+.result{border-radius:10px;padding:8px 12px;font-weight:700;margin-top:6px}
+.result.ok{background:var(--out-tint);border:1.5px solid var(--out)}
+.result.no{background:var(--bad-tint);border:1.5px solid var(--bad)}
+
+.flow{display:grid;grid-template-columns:1fr;gap:8px;align-items:stretch}
+@media (min-width:900px){.flow{grid-template-columns:1.1fr 40px 1fr 40px 1.2fr 40px .9fr;gap:0}}
+.fnode{border:1.5px solid var(--line);border-radius:12px;background:var(--panel);padding:8px 10px;min-height:130px;transition:border-color .2s,background .2s}
+.fnode h4{margin:0 0 4px;font-size:14px}
+.fnode.on{border-color:var(--step);background:var(--step-tint)}
+.fnode.out{border-color:var(--out);background:var(--out-tint)}
+.farrow{display:grid;place-items:center;font-size:24px;color:var(--muted)}
+@media (max-width:899px){.farrow{transform:rotate(90deg);height:26px}}
+.fn{display:inline-block;margin-top:4px;padding:3px 10px;border-radius:99px;border:1.5px solid var(--acc);color:var(--acc);font:700 13px var(--mono)}
+.queue{display:flex;gap:4px;flex-wrap:wrap;min-height:34px}
+.queue span{border:1.5px solid var(--out);background:var(--out-tint);border-radius:7px;padding:1px 8px;font:800 17px var(--mono)}
+.tag{display:inline-block;margin-top:6px;font:700 12px var(--ui);padding:2px 8px;border-radius:99px;border:1.5px solid var(--line);color:var(--muted)}
+
+.under{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:14px;align-items:start}
+@media (max-width:900px){.under{grid-template-columns:1fr}}
+.caption{border-left:5px solid var(--line);background:var(--bg);padding:12px 16px;border-radius:0 12px 12px 0;min-height:130px;font-size:16.5px;line-height:1.5}
+.caption .who{display:block;font-weight:700;font-size:13px;margin-bottom:3px}
+.caption.k-step{border-left-color:var(--step)} .caption.k-step .who{color:var(--step)}
+.caption.k-out{border-left-color:var(--out)} .caption.k-out .who{color:var(--out)}
+.caption.k-bad{border-left-color:var(--bad)} .caption.k-bad .who{color:var(--bad)}
+.caption code{background:var(--soft);padding:1px 5px;border-radius:5px}
+.code{background:var(--bg);border:1px solid var(--line);border-radius:12px;max-height:520px;overflow:auto;padding:10px 0;font:13px/1.55 var(--mono)}
+.fnh{font:700 12px var(--ui);color:var(--muted);padding:8px 14px 2px}
+.fnh:first-child{padding-top:0}
+.ln{display:grid;grid-template-columns:42px 1fr;padding-right:10px;white-space:pre;transition:background .2s}
+.ln i{font-style:normal;color:var(--muted);text-align:right;padding-right:12px;user-select:none;opacity:.7}
+.ln.on-step{background:var(--step-tint);box-shadow:inset 4px 0 0 var(--step)}
+.ln.on-out{background:var(--out-tint);box-shadow:inset 4px 0 0 var(--out)}
+.ln.on-bad{background:var(--bad-tint);box-shadow:inset 4px 0 0 var(--bad)}
+.codenote{font-size:13px;color:var(--muted);margin-top:8px}
+.cmp{margin-top:26px;max-width:72ch}
+.cmp h2{margin-top:0}
+.cmp table{border-collapse:collapse;width:100%;font-size:15px;margin:8px 0 12px}
+.cmp th,.cmp td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+.cmp th{background:var(--panel)}
+footer{margin-top:34px;color:var(--muted);font-size:14px;max-width:72ch}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>How the CLI prints and reads numbers</h1>
+<p class="lead">The CLI has no <code>printf</code> and no <code>strtol</code>, so <code>uart_cli.c</code> carries tiny versions of its own. Pick a function, change the input, and step through it forward and back. Each page says why the function exists, how it works, and where the CLI uses it.</p>
+
+<div class="tabs" id="tabs" role="tablist" aria-label="Functions"></div>
+
+<div class="stage">
+  <div class="why" id="why"></div>
+  <div class="setup" id="setup"></div>
+
+  <div class="transport">
+    <button class="tbtn" id="bStart" type="button">Start</button>
+    <button class="tbtn big" id="bBack" type="button">Back</button>
+    <button class="tbtn big" id="bNext" type="button">Next</button>
+    <button class="tbtn big" id="bPlay" type="button">Play</button>
+    <span class="stepno" id="stepno">Step 1 of 1</span>
+    <label class="spd">Speed <input id="speed" type="range" min="200" max="1800" step="100" value="800" aria-label="Delay between steps in milliseconds"><span id="speedv" class="mono">800 ms</span></label>
+  </div>
+  <input class="scrub" id="scrub" type="range" min="0" max="0" value="0" aria-label="Step position">
+  <div class="chips" id="chips" aria-label="All steps. Click one to jump to it."></div>
+  <div class="chipkey">
+    <span><i style="border-color:var(--step);background:var(--step-tint)"></i>a step</span>
+    <span><i style="border-color:var(--out);background:var(--out-tint)"></i>a byte is sent, or a value is stored</span>
+    <span><i style="border-color:var(--bad);background:var(--bad-tint)"></i>a check fails</span>
+    <span>Left and right arrow keys also step.</span>
+  </div>
+
+  <div class="viz" id="viz" aria-live="off"></div>
+
+  <div class="under">
+    <div class="caption" id="caption" aria-live="polite"></div>
+    <div>
+      <div class="code" id="code" tabindex="0" aria-label="Source code of uart_cli.c with the running line highlighted"></div>
+      <p class="codenote">Lines come from <code>programs/uart_cli.c</code>, with the same line numbers.</p>
+    </div>
+  </div>
+</div>
+
+<section class="cmp">
+  <h2>Is <code>uart_puts</code> redundant?</h2>
+  <p>No. <code>uart_puts(s)</code> is only a shortcut for <code>print_str(uart_putc, s)</code>, and that is the reason to keep it. C's own library has the same pair.</p>
+  <table>
+    <tr><th>Here</th><th>C library</th><th>Meaning</th></tr>
+    <tr><td><code>uart_puts(s)</code></td><td><code>puts(s)</code></td><td>Send to the usual output. You do not choose where.</td></tr>
+    <tr><td><code>print_str(put, s)</code></td><td><code>fputs(s, stream)</code></td><td>Send to any output you give it.</td></tr>
+  </table>
+  <p>The file calls <code>uart_puts</code> 14 times. Without the wrapper each call would read <code>print_str(uart_putc, "...")</code>. The wrapper also hides which output is the normal one. If you later change the normal path, you edit one function. The general <code>print_str</code> stays, because the HardFault report needs it with <code>fault_putc</code>. The cost is one extra call.</p>
+</section>
+
+<footer>
+  The steps show what the code does, one line at a time. The two output functions are the real ones from the file. Here the pages only show the bytes arriving, not the USART timing from the TX page.
+</footer>
+</div>
+
+<script>
+/*SIM-START*/
+const U32 = 4294967295;
+const DIG = "0123456789ABCDEF";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const hx = n => "0x" + (n >>> 0).toString(16).toUpperCase();
+const hx8 = n => "0x" + (n >>> 0).toString(16).toUpperCase().padStart(8, "0");
+const q = ch => ch === "\0" ? "'\\0'" : `'${esc(ch)}'`;
+
+/* ---- print_hex32 ---- */
+function buildHex(v){
+  v = v >>> 0;
+  const steps = []; let out = "";
+  const add = (lines, text, kind, extra) => steps.push({lines, text, kind, view: Object.assign({v, out, shift: null, nib: null, n: null, hit: false}, extra || {})});
+  out = "0"; add([121], `The function starts with the fixed text. <code>put('0')</code> sends <code>0</code>.`, "out");
+  out = "0x"; add([122], `<code>put('x')</code> sends <code>x</code>. Output so far: <code>0x</code>.`, "out");
+  for (let i = 0; i < 8; i++){
+    const shift = 28 - 4 * i, moved = v >>> shift, n = moved & 15;
+    add([123,124], `<code>shift</code> = ${shift}. <code>v &gt;&gt; ${shift}</code> moves group ${i + 1} of 8 (bits ${shift + 3} to ${shift}) to the bottom: ${hx(moved)}. <code>&amp; 0xF</code> keeps only the lowest 4 bits: <b>${n}</b> (binary ${n.toString(2).padStart(4, "0")}).`, "step", {shift, nib: i, n, moved});
+    out += DIG[n];
+    add([124], `${n} is an <b>index</b> into <code>digits</code>. <code>digits[${n}]</code> is <code>'${DIG[n]}'</code>, so <code>put('${DIG[n]}')</code> sends it.`, "out", {shift, nib: i, n, moved, hit: true});
+  }
+  add([123,125,126], `<code>shift</code> is now -4. The test <code>shift &gt;= 0</code> fails, so the loop ends and the function returns. It sent <code>${out}</code>: always <code>0x</code> and 8 digits, so a small value gets leading zeros.`, "step", {shift: -4, nib: 8});
+  return steps;
+}
+
+/* ---- print_dec32 ---- */
+function buildDec(v){
+  v = v >>> 0;
+  const steps = []; const buf = Array(10).fill(null); let n = 0, out = "", phase = "collect", hot = -1;
+  const add = (lines, text, kind, extra) => steps.push({lines, text, kind, view: Object.assign({v, n, buf: buf.slice(), out, phase, hot, calc: ""}, extra || {})});
+  add([130,131], `<code>buf</code> has room for 10 characters, the most a 32-bit number needs. <code>n</code> = 0 counts the digits stored so far. <code>v</code> = ${v}.`, "step");
+  do {
+    const d = v % 10, c = String(d);
+    buf[n] = c; hot = n; const old = v; n++;
+    add([134], `<code>v % 10</code> is the <b>last</b> digit of ${old}: <b>${d}</b>. <code>'0' + ${d}</code> is the character <code>'${c}'</code>. It is stored in <code>buf[${n - 1}]</code>, and <code>n</code> becomes ${n}.`, "out", {calc: `${old} % 10 = ${d}`});
+    v = Math.floor(v / 10);
+    add([135,136], `<code>v /= 10</code> drops that last digit: ${old} becomes ${v}. ` + (v !== 0 ? `<code>v</code> is not 0, so the loop runs again.` : `<code>v</code> is 0, so the loop stops. Every digit is in <code>buf</code>, <b>last digit first</b>.`), "step", {calc: `${old} / 10 = ${v}`});
+  } while (v !== 0);
+  phase = "print"; hot = -1;
+  while (n !== 0){
+    n--; const c = buf[n]; out += c; hot = n;
+    add([138,139], `<code>n</code> is not 0. <code>--n</code> makes it ${n}, and <code>put(buf[${n}])</code> sends <code>'${c}'</code>. Reading <code>buf</code> backwards puts the digits in the right order.`, "out");
+  }
+  hot = -1;
+  add([138,140,141], `<code>n</code> is 0, so the loop ends. The number went out with its first digit first, although the digits were found last digit first.`, "step");
+  return steps;
+}
+
+/* ---- parse_u32 ---- */
+function hexvalOf(ch){
+  if (ch >= "0" && ch <= "9") return {d: ch.charCodeAt(0) - 48, line: 152, how: `<code>'${ch}' - '0'</code>`};
+  if (ch >= "a" && ch <= "f") return {d: ch.charCodeAt(0) - 97 + 10, line: 153, how: `<code>'${ch}' - 'a' + 10</code>`};
+  if (ch >= "A" && ch <= "F") return {d: ch.charCodeAt(0) - 65 + 10, line: 154, how: `<code>'${ch}' - 'A' + 10</code>`};
+  return {d: -1, line: 155, how: `no rule matches`};
+}
+function buildParse(str){
+  const steps = []; let base = 10, v = 0, p = 0, d = null, chk = {};
+  let result = null;
+  const add = (lines, text, kind, extra) => steps.push({lines, text, kind, view: Object.assign({str, p, base, v, d, chk: Object.assign({}, chk), result}, extra || {})});
+  const fail = (lines, why) => { result = {ok: false, why}; add(lines, `Return 0: <b>${why}</b>. <code>out</code> is not written.`, "bad"); };
+  add([162,163], `<code>base</code> starts at 10 and <code>v</code> (the number built so far) at 0. <code>s</code> points at the first character.`, "step");
+  const pre = str[0] === "0" && (str[1] === "x" || str[1] === "X");
+  if (pre){
+    base = 16; p = 2;
+    add([165,166,167], `The text starts with <code>0x</code>, so <code>base</code> = 16 and <code>s += 2</code> skips those two characters.`, "step");
+  } else {
+    add([165], `The text does not start with <code>0x</code> or <code>0X</code>, so <code>base</code> stays 10.`, "step");
+  }
+  if (p >= str.length){ fail([169,170], str.length ? "nothing follows the 0x prefix" : "the text is empty"); return steps; }
+  add([169], `At least one character is left, so this is not empty input.`, "step");
+  for (; p < str.length; p++){
+    const ch = str[p], h = hexvalOf(ch); d = h.d; chk = {};
+    add([173,174, h.line], `Next character: <code>'${esc(ch)}'</code>. <code>hexval</code> turns it into a value: ${h.how}` + (h.d >= 0 ? ` = <b>${h.d}</b>.` : `, so it returns <b>-1</b>.`), "step", {cur: p});
+    const okDigit = h.d >= 0, inBase = h.d >= 0 && h.d < base;
+    chk = {digit: okDigit, inBase};
+    if (!inBase){
+      add([175,176], h.d < 0 ? `<code>d &lt; 0</code> is true: <code>'${esc(ch)}'</code> is not a digit at all.` : `<code>d &gt;= base</code> is true: ${h.d} is not allowed in base ${base}.`, "bad", {cur: p});
+      fail([176], h.d < 0 ? `'${esc(ch)}' is not a digit` : `'${esc(ch)}' is not a base ${base} digit`);
+      return steps;
+    }
+    add([175], `<code>d</code> = ${h.d} is a valid digit in base ${base}. The check passes.`, "step", {cur: p});
+    const limit = Math.floor((U32 - h.d) / base), over = v > limit;
+    chk = {digit: true, inBase: true, limit, over};
+    if (over){
+      const wrapped = (v * base + h.d) % 4294967296;
+      add([178,179], `Limit = <code>(0xFFFFFFFF - ${h.d}) / ${base}</code> = ${limit}. <code>v</code> = ${v} is bigger, so <code>v * ${base} + ${h.d}</code> would not fit in 32 bits. The CPU would not warn: it would wrap to <b>${wrapped}</b> and look like a valid number. That is why the check comes first.`, "bad", {cur: p});
+      fail([179], "the number does not fit in 32 bits");
+      return steps;
+    }
+    add([178], `Limit = <code>(0xFFFFFFFF - ${h.d}) / ${base}</code> = ${limit}. <code>v</code> = ${v} is not bigger, so <code>v * ${base} + ${h.d}</code> will fit.`, "step", {cur: p});
+    const old = v; v = v * base + h.d;
+    add([181], `<code>v = v * ${base} + ${h.d}</code>: ${old} × ${base} + ${h.d} = <b>${v}</b>. Each new digit shifts the old ones one place left and adds itself.`, "out", {cur: p, hot: true});
+  }
+  d = null; chk = {};
+  result = {ok: true, v};
+  add([182,183,184], `No characters are left. <code>*out = v</code> stores <b>${v}</b> (${hx8(v)}) and the function returns 1.`, "out");
+  return steps;
+}
+
+/* ---- print_str, uart_puts and the two outputs ---- */
+function buildStr(text, mode){
+  const steps = [];
+  const fn = mode === "fault" ? "fault_putc" : "uart_putc";
+  let pos = null, ring = [], sent = "", put = null, active = "", dr = null, shift = null;
+  const add = (lines, text2, kind, extra) => steps.push({lines, text: text2, kind, view: Object.assign({text, mode, fn, pos, ring: ring.slice(), dr, shift, sent, put, active}, extra || {})});
+  if (mode === "puts"){
+    add([143,145], `Main calls <code>uart_puts("${esc(text)}")</code>. This function only does one thing: <code>print_str(uart_putc, s)</code>. It chooses the output for you.`, "step", {active: "wrap"});
+  }
+  put = fn; pos = 0;
+  add([110], `<code>print_str</code> starts. <code>put</code> now holds the address of <code>${fn}</code>. <code>s</code> points at the first character. <code>print_str</code> does not know how a byte is sent.`, "step", {active: "str"});
+  for (let i = 0; i < text.length; i++){
+    const c = text[i]; pos = i;
+    add([112], `<code>*s</code> is ${q(c)}, not <code>'\\0'</code>, so the loop continues.`, "step", {active: "str"});
+    pos = i + 1;
+    add([113], `<code>put(*s++)</code> reads ${q(c)}, moves <code>s</code> to the next character, and calls <code>put</code>. Since <code>put</code> holds <code>${fn}</code>, this runs <code>${fn}(${q(c)})</code>.`, "step", {active: "put", read: i});
+    if (mode === "fault"){
+      sent += c;
+      add([98,100], `<code>fault_putc</code> waits until TXE = 1, then writes ${q(c)} to DR. The byte goes to the USART <b>now</b>, and the CPU waited for it. This is the path the HardFault report uses.`, "out", {active: "sink", read: i});
+    } else if (dr === null){
+      ring.push(c);
+      add([89,92,93], `<code>uart_putc</code>: the ring is not full, so <code>ring_push</code> stores ${q(c)}, and <code>TXEIE</code> is set. TXE is 1 (DR is empty), so the interrupt runs <b>at once</b>, before main continues.`, "out", {active: "sink", read: i});
+      ring = [];
+      if (shift === null){ shift = c; dr = null; }
+      else { dr = c; }
+      add([295,296], `The handler runs. The ring is not empty, so <code>DR = ring_pop()</code> moves ${q(c)} into DR. ` + (shift === c ? `The shift register is free, so the USART takes it from DR and starts sending it right away.` : `The shift register is still busy with the byte before, so ${q(c)} waits in DR. TXE is now 0.`), "out", {active: "sink", read: i});
+    } else {
+      ring.push(c);
+      add([89,92,93], `<code>uart_putc</code>: the ring is not full, so <code>ring_push</code> stores ${q(c)}. <code>TXEIE</code> is already 1. But TXE is 0, because DR still holds a byte, so <b>no interrupt runs</b>. ${q(c)} waits in the ring, and main does not wait.`, "out", {active: "sink", read: i});
+    }
+  }
+  add([112], `<code>*s</code> is <code>'\\0'</code>, so the loop ends.`, "step", {active: "str"});
+  add([114,115], `<code>print_str</code> returns.` + (mode === "fault" ? ` Every byte has already gone to the USART.` : (ring.length ? ` main is free to go on. The first bytes are already in the USART, and ${ring.length} wait${ring.length === 1 ? "s" : ""} in the ring.` : ` main is free to go on. Every byte is already in the USART.`)), "step", {active: "str"});
+  if (mode !== "fault"){
+    sent = text; ring = []; dr = null; shift = null;
+    add([], `Later, without any help from <code>print_str</code>, each time the wire finishes a byte, TXE becomes 1 and the interrupt moves the next byte from the ring into DR. That is the mechanism from the TX page. The terminal now shows <code>${esc(text)}</code>.`, "out", {active: "term"});
+  }
+  return steps;
+}
+/*SIM-END*/
+</script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+
+/* ---------- source lines, same numbers as programs/uart_cli.c ---------- */
+const SRC = {
+  putc:[ "uart_putc, the normal output", [[87,"static void uart_putc(char c)"],[88,"{"],[89,"    while (ring_full(&g_tx)) {"],[90,"        /* the TX ISR drains one byte per TXE event */"],[91,"    }"],[92,"    ring_push(&g_tx, (uint8_t)c);"],[93,"    USART2->CR1 |= USART_CR1_TXEIE;       /* make sure the ISR is armed */"],[94,"}"]]],
+  isr:[ "USART2_IRQHandler, TX part", [[293,"    if (((USART2->CR1 & USART_CR1_TXEIE) != 0u) &&"],[294,"        ((USART2->SR & USART_SR_TXE) != 0u)) {"],[295,"        if (!ring_empty(&g_tx)) {"],[296,"            USART2->DR = ring_pop(&g_tx);"],[297,"        } else {"],[298,"            USART2->CR1 &= ~USART_CR1_TXEIE;"],[299,"        }"],[300,"    }"]]],
+  fault:[ "fault_putc, the polled output", [[96,"static void fault_putc(char c)"],[97,"{"],[98,"    while ((USART2->SR & USART_SR_TXE) == 0u) {"],[99,"    }"],[100,"    USART2->DR = (uint8_t)c;"],[101,"}"]]],
+  str:[ "print_str", [[110,"static void print_str(putc_fn put, const char *s)"],[111,"{"],[112,"    while (*s != '\\0') {"],[113,"        put(*s++);"],[114,"    }"],[115,"}"]]],
+  hex:[ "print_hex32", [[117,"static void print_hex32(putc_fn put, uint32_t v)"],[118,"{"],[119,"    static const char digits[] = \"0123456789ABCDEF\";"],[121,"    put('0');"],[122,"    put('x');"],[123,"    for (int shift = 28; shift >= 0; shift -= 4) {"],[124,"        put(digits[(v >> shift) & 0xFu]);"],[125,"    }"],[126,"}"]]],
+  dec:[ "print_dec32", [[128,"static void print_dec32(putc_fn put, uint32_t v)"],[129,"{"],[130,"    char buf[10];"],[131,"    uint32_t n = 0u;"],[133,"    do {"],[134,"        buf[n++] = (char)('0' + (v % 10u));"],[135,"        v /= 10u;"],[136,"    } while (v != 0u);"],[138,"    while (n != 0u) {"],[139,"        put(buf[--n]);"],[140,"    }"],[141,"}"]]],
+  puts:[ "uart_puts", [[143,"static void uart_puts(const char *s)"],[144,"{"],[145,"    print_str(uart_putc, s);"],[146,"}"]]],
+  hexval:[ "hexval", [[150,"static int hexval(char c)"],[151,"{"],[152,"    if (c >= '0' && c <= '9') return c - '0';"],[153,"    if (c >= 'a' && c <= 'f') return c - 'a' + 10;"],[154,"    if (c >= 'A' && c <= 'F') return c - 'A' + 10;"],[155,"    return -1;"],[156,"}"]]],
+  parse:[ "parse_u32", [[160,"static int parse_u32(const char *s, uint32_t *out)"],[161,"{"],[162,"    uint32_t base = 10u;"],[163,"    uint32_t v = 0u;"],[165,"    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {"],[166,"        base = 16u;"],[167,"        s += 2;"],[168,"    }"],[169,"    if (*s == '\\0') {"],[170,"        return 0;"],[171,"    }"],[173,"    for (; *s != '\\0'; s++) {"],[174,"        int d = hexval(*s);"],[175,"        if (d < 0 || (uint32_t)d >= base) {"],[176,"            return 0;"],[177,"        }"],[178,"        if (v > (0xFFFFFFFFu - (uint32_t)d) / base) {"],[179,"            return 0;                       /* would overflow */"],[180,"        }"],[181,"        v = v * base + (uint32_t)d;"],[182,"    }"],[183,"    *out = v;"],[184,"    return 1;"],[185,"}"]]]
+};
+
+/* ---------- the four pages ---------- */
+const TABS = [
+  {id:"str", title:"print_str and the output function", blocks:["puts","str","putc","isr","fault"],
+   why:[["Why it exists","Every CLI message is text. The same text code must work for two outputs: the normal queued one, and the polled one used inside a crash."],
+        ["How it works","<code>print_str</code> does not know how a byte is sent. It receives a function and calls it once for each character."],
+        ["Where the CLI uses it","<code>uart_puts</code> for prompts and replies. The HardFault report calls it with <code>fault_putc</code>."]]},
+  {id:"hex", title:"print_hex32", blocks:["hex"],
+   why:[["Why it exists","Addresses and register values are easiest to read in hex, and this build has no <code>printf(\"%08X\")</code>."],
+        ["How it works","A hex digit is exactly 4 bits. The function walks the 32 bits four at a time, top first, and looks each group up in a table of digit characters."],
+        ["Where the CLI uses it","<code>peek</code> and <code>poke</code> print <code>0x40020014 = 0x00000020</code>. The HardFault report prints registers."]]},
+  {id:"dec", title:"print_dec32", blocks:["dec"],
+   why:[["Why it exists","People read the tick count in decimal, and this build has no <code>printf(\"%u\")</code>."],
+        ["How it works","Dividing by 10 and taking the remainder finds the last digit, so digits come out last first. The function stores them, then sends them in reverse."],
+        ["Where the CLI uses it","The <code>ticks</code> command prints the milliseconds since reset."]]},
+  {id:"parse", title:"parse_u32 and hexval", blocks:["parse","hexval"],
+   why:[["Why it exists","What you type is text. <code>peek</code> and <code>poke</code> need the address as a number the CPU can use."],
+        ["How it works","Read left to right. Each digit shifts what you have by one place and adds the new digit. Before each step, check that the result still fits in 32 bits."],
+        ["Where the CLI uses it","<code>peek &lt;addr&gt;</code> and <code>poke &lt;addr&gt; &lt;val&gt;</code>. A bad number gives the usage message."]]}
+];
+
+const st = {tab:"str", trace:[], idx:0, timer:null, str:{text:"hello", mode:"puts"}, hex:"0x40020014", dec:"1234", parse:"0x40020014"};
+
+function setupFor(id){
+  if (id === "str") return `<label for="inText">Text</label><input id="inText" type="text" maxlength="8" value="${esc(st.str.text)}" spellcheck="false">
+    <span class="lab">How it is called</span>
+    <div class="seg" id="segMode" role="group" aria-label="How print_str is called">
+      <button type="button" data-v="puts" aria-pressed="${st.str.mode === "puts"}">uart_puts(s)</button>
+      <button type="button" data-v="uart" aria-pressed="${st.str.mode === "uart"}">print_str(uart_putc, s)</button>
+      <button type="button" data-v="fault" aria-pressed="${st.str.mode === "fault"}">print_str(fault_putc, s)</button>
+    </div>`;
+  if (id === "hex") return `<label for="inVal">Value (hex or decimal)</label><input id="inVal" type="text" value="${esc(st.hex)}" spellcheck="false">
+    <div class="seg" id="presets">${["0x40020014","0x20","0xDEADBEEF","0","4294967295"].map(v => `<button type="button" data-t="${v}">${v}</button>`).join("")}</div><span class="err" id="inErr"></span>`;
+  if (id === "dec") return `<label for="inVal">Value (decimal)</label><input id="inVal" type="text" value="${esc(st.dec)}" spellcheck="false">
+    <div class="seg" id="presets">${["1234","0","7","48213","4294967295"].map(v => `<button type="button" data-t="${v}">${v}</button>`).join("")}</div><span class="err" id="inErr"></span>`;
+  return `<label for="inVal">Text to parse</label><input id="inVal" type="text" maxlength="14" value="${esc(st.parse)}" spellcheck="false">
+    <div class="seg" id="presets">${[["0x40020014",""],["1234",""],["0x2A",""],["12a","bad"],["4294967296","bad"],["0x","bad"],["0xZZ","bad"]].map(([v,c]) => `<button type="button" class="${c}" data-t="${v}">${v}</button>`).join("")}</div>`;
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function drawTabs(){
+  $("#tabs").innerHTML = TABS.map(t => `<button class="tab" role="tab" data-id="${t.id}" aria-selected="${t.id === st.tab}">${t.title}</button>`).join("");
+}
+function drawStatic(){
+  const t = TABS.find(x => x.id === st.tab);
+  $("#why").innerHTML = t.why.map(([h, b]) => `<div><b>${h}</b><span>${b}</span></div>`).join("");
+  $("#setup").innerHTML = setupFor(st.tab);
+  $("#code").innerHTML = t.blocks.map(k => `<div class="fnh">${esc(SRC[k][0])}</div>` + SRC[k][1].map(([n, s]) => `<div class="ln" data-l="${n}"><i>${n}</i><span>${esc(s)}</span></div>`).join("")).join("");
+}
+
+function parseInput(s){
+  s = s.trim();
+  if (/^0x[0-9a-f]{1,8}$/i.test(s)) return parseInt(s, 16);
+  if (/^[0-9]{1,10}$/.test(s) && +s <= 4294967295) return +s;
+  return null;
+}
+
+function rebuild(keep){
+  stop();
+  const id = st.tab;
+  if (id === "str"){ st.trace = buildStr(st.str.text || "hello", st.str.mode); }
+  else if (id === "hex"){ const v = parseInput(st.hex); $("#inErr").textContent = v === null ? "Use 0x… with up to 8 hex digits, or a decimal up to 4294967295." : ""; st.trace = buildHex(v === null ? 0 : v); }
+  else if (id === "dec"){ const v = parseInput(st.dec); $("#inErr").textContent = (v === null || /^0x/i.test(st.dec.trim())) ? "Use a decimal up to 4294967295." : ""; st.trace = buildDec(v === null || /^0x/i.test(st.dec.trim()) ? 0 : v); }
+  else { st.trace = buildParse(st.parse); }
+  st.idx = keep ? Math.min(st.idx, st.trace.length - 1) : 0;
+  $("#scrub").max = st.trace.length - 1;
+  $("#chips").innerHTML = st.trace.map((s, i) => `<button type="button" class="chip k-${s.kind}" data-i="${i}" title="Step ${i + 1}" aria-label="Go to step ${i + 1}">${i + 1}</button>`).join("");
+  render();
+}
+
+/* ---------- visuals ---------- */
+function strCells(str, pos, read, bad){
+  const chars = [...str], cells = chars.map((c, i) => `<div class="cell${i === read ? " read" : ""}${i < pos ? " on" : ""}${bad === i ? " bad" : ""}"><div class="i">${i}</div><div class="c">${esc(c === " " ? "\u2423" : c)}</div><div class="p">${i === pos ? "s" : ""}</div></div>`);
+  cells.push(`<div class="cell${pos === chars.length ? " hot" : ""}"><div class="i">${chars.length}</div><div class="c">\\0</div><div class="p">${pos === chars.length ? "s" : ""}</div></div>`);
+  return `<div class="cells">${cells.join("")}</div>`;
+}
+function vizStr(v){
+  const cell = c => c ? `<span>${esc(c === " " ? "\u2423" : c)}</span>` : "";
+  const sink = v.mode === "fault"
+    ? `<h4>fault_putc</h4><div class="sub">waits for TXE, writes DR now</div><span class="tag">polled, CPU waits</span>`
+    : `<h4>uart_putc and the TX interrupt</h4><div class="sub">TX ring (waiting)</div><div class="queue">${v.ring.map(cell).join("")}</div><div class="sub">DR</div><div class="queue">${cell(v.dr)}</div><div class="sub">shift register (on the wire)</div><div class="queue">${cell(v.shift)}</div><span class="tag">TXEIE set: the interrupt feeds the USART</span>`;
+  return `<div class="flow">
+    <div class="fnode${v.active === "str" || v.active === "wrap" ? " on" : ""}"><h4>${v.mode === "puts" ? "uart_puts, then print_str" : "print_str"}</h4>${strCells(v.text, v.pos === null ? -1 : v.pos, v.read)}</div>
+    <div class="farrow">→</div>
+    <div class="fnode${v.active === "put" ? " on" : ""}"><h4>put</h4><div class="sub">a variable that holds a function's address</div>${v.put ? `<span class="fn">${v.put}</span>` : `<span class="sub">not set yet</span>`}</div>
+    <div class="farrow">→</div>
+    <div class="fnode${v.active === "sink" ? " out" : ""}">${sink}</div>
+    <div class="farrow">→</div>
+    <div class="fnode${v.active === "term" ? " out" : ""}"><h4>Terminal</h4><div class="out">${esc(v.sent)}</div></div>
+  </div>`;
+}
+function vizHex(v){
+  let h = `<div class="row"><span class="k">v</span><span class="big">${hx8(v.v)}</span><span class="sub">${v.v} in decimal</span></div><div class="nibs">`;
+  const bits = (v.v >>> 0).toString(2).padStart(32, "0");
+  for (let i = 0; i < 8; i++){
+    const g = bits.slice(4 * i, 4 * i + 4), cls = v.nib === i ? " cur" : (v.nib !== null && i < v.nib || (v.nib === i && v.hit) ? " done" : "");
+    const printed = (v.nib !== null && (i < v.nib || (i === v.nib && v.hit))) ? DIG[parseInt(g, 2)] : "";
+    h += `<div class="nib${cls}"><div class="b">${[...g].map(b => `<span>${b}</span>`).join("")}</div><div class="d">${printed}</div><div class="r">bits ${31 - 4 * i}–${28 - 4 * i}</div></div>`;
+  }
+  h += `</div>`;
+  if (v.shift !== null && v.shift >= 0 && v.n !== null){
+    h += `<div class="calc">shift = <em>${v.shift}</em> &nbsp; v &gt;&gt; ${v.shift} = <em>${hx(v.moved)}</em> &nbsp; &amp; 0xF = <strong>${v.n}</strong></div>`;
+  } else h += `<div class="calc">&nbsp;</div>`;
+  h += `<div class="sub" style="margin-bottom:2px">digits = "0123456789ABCDEF"</div><div class="digs">` +
+    [...DIG].map((c, i) => `<div class="dig${v.n === i && v.nib !== null ? (v.hit ? " hit" : " idx") : ""}"><div class="i">${i}</div><div class="c">${c}</div></div>`).join("") + `</div>`;
+  h += `<div class="row"><span class="k">sent so far</span><span class="out">${esc(v.out)}</span></div>`;
+  return h;
+}
+function vizDec(v){
+  let h = `<div class="row"><span class="k">v</span><span class="big">${v.v}</span><span class="k">n</span><span class="big">${v.n}</span><span class="sub">${v.phase === "collect" ? "collecting digits, last digit first" : "sending digits, reading buf backwards"}</span></div>`;
+  h += `<div class="calc">${v.calc ? esc(v.calc) : "&nbsp;"}</div>`;
+  h += `<div class="sub">buf</div><div class="cells">` + v.buf.map((c, i) => `<div class="cell${c !== null ? " on" : ""}${v.hot === i ? " hot" : ""}"><div class="i">${i}</div><div class="c">${c === null ? "" : c}</div><div class="p"></div></div>`).join("") + `</div>`;
+  h += `<div class="row"><span class="k">sent so far</span><span class="out">${esc(v.out)}</span></div>`;
+  return h;
+}
+function vizParse(v){
+  const chars = [...v.str];
+  let cells = chars.map((c, i) => `<div class="cell${v.cur === i ? " hot" : ""}${i < v.p ? " on" : ""}"><div class="i">${i}</div><div class="c">${esc(c)}</div><div class="p">${i === v.p ? "s" : ""}</div></div>`).join("");
+  cells += `<div class="cell${v.p >= chars.length ? " hot" : ""}"><div class="i">${chars.length}</div><div class="c">\\0</div><div class="p">${v.p >= chars.length ? "s" : ""}</div></div>`;
+  let h = `<div class="sub">text (s points at the next character to read)</div><div class="cells">${cells}</div>`;
+  h += `<div class="vars">
+    <div class="var"><div class="t">base</div><div class="v">${v.base}</div></div>
+    <div class="var${v.hot ? " hot" : ""}"><div class="t">v (number so far)</div><div class="v">${v.v}</div><div class="h">${hx8(v.v)}</div></div>
+    <div class="var"><div class="t">d (this digit)</div><div class="v">${v.d === null ? "" : v.d}</div></div></div>`;
+  const c = v.chk || {};
+  const box = (t, n, state) => `<div class="chk ${state}"><span class="t">${t}</span><span class="n">${n}</span></div>`;
+  h += `<div class="checks">` +
+    box("Is it a digit?", c.digit === undefined ? "d &gt;= 0" : (c.digit ? "yes, d &gt;= 0" : "no, d = -1"), c.digit === undefined ? "idle" : (c.digit ? "ok" : "no")) +
+    box("Allowed in this base?", c.inBase === undefined ? "d &lt; base" : (c.inBase ? `yes, d &lt; ${v.base}` : `no, d is not &lt; ${v.base}`), c.inBase === undefined ? "idle" : (c.inBase ? "ok" : "no")) +
+    box("Will the next step fit in 32 bits?", c.limit === undefined ? "v &le; (0xFFFFFFFF - d) / base" : `v = ${v.v}, limit = ${c.limit}: ${c.over ? "<b>too big</b>" : "fits"}`, c.limit === undefined ? "idle" : (c.over ? "no" : "ok")) + `</div>`;
+  if (v.result) h += v.result.ok
+    ? `<div class="result ok">Return 1. <code>out</code> = ${v.result.v} (${hx8(v.result.v)})</div>`
+    : `<div class="result no">Return 0: ${v.result.why}. The CLI would print the usage message.</div>`;
+  return h;
+}
+
+/* ---------- drawing ---------- */
+function render(){
+  const s = st.trace[st.idx], id = st.tab;
+  $("#stepno").textContent = `Step ${st.idx + 1} of ${st.trace.length}`;
+  $("#scrub").value = st.idx;
+  $("#bBack").disabled = $("#bStart").disabled = st.idx === 0;
+  $("#bNext").disabled = st.idx === st.trace.length - 1;
+  document.querySelectorAll(".chip").forEach((c, i) => c.classList.toggle("cur", i === st.idx));
+  const cap = $("#caption");
+  cap.className = "caption k-" + s.kind;
+  cap.innerHTML = `<span class="who">${s.kind === "bad" ? "A check fails" : s.kind === "out" ? "A byte is sent or a value is stored" : "Step"}</span>${s.text}`;
+  const viewer = {str: vizStr, hex: vizHex, dec: vizDec, parse: vizParse}[id];
+  $("#viz").innerHTML = viewer(s.view);
+  const codeEl = $("#code");
+  codeEl.querySelectorAll(".ln").forEach(e => e.classList.remove("on-step","on-out","on-bad"));
+  let first = null;
+  s.lines.forEach(n => { const e = codeEl.querySelector(`.ln[data-l="${n}"]`); if (e){ e.classList.add("on-" + s.kind); first = first || e; } });
+  if (first){
+    const r = first.getBoundingClientRect(), b = codeEl.getBoundingClientRect();
+    if (r.top < b.top + 30 || r.bottom > b.bottom - 30) codeEl.scrollTop += r.top - b.top - b.height / 3;
+  }
+}
+
+/* ---------- controls ---------- */
+function go(i){ st.idx = Math.max(0, Math.min(st.trace.length - 1, i)); render(); }
+function stop(){ if (st.timer){ clearInterval(st.timer); st.timer = null; } const b = $("#bPlay"); if (b){ b.textContent = "Play"; b.classList.remove("on"); } }
+function play(){
+  if (st.timer){ stop(); return; }
+  if (st.idx === st.trace.length - 1) st.idx = 0;
+  $("#bPlay").textContent = "Pause"; $("#bPlay").classList.add("on");
+  render();
+  st.timer = setInterval(() => { if (st.idx >= st.trace.length - 1){ stop(); return; } go(st.idx + 1); if (st.idx >= st.trace.length - 1) stop(); }, +$("#speed").value);
+}
+function wireSetup(){
+  const inText = $("#inText"), inVal = $("#inVal");
+  if (inText) inText.addEventListener("input", e => { st.str.text = e.target.value; rebuild(); });
+  if (inVal) inVal.addEventListener("input", e => { st[st.tab] = e.target.value; rebuild(); });
+  const pre = $("#presets");
+  if (pre) pre.addEventListener("click", e => { const b = e.target.closest("button[data-t]"); if (!b) return; st[st.tab] = b.dataset.t; $("#inVal").value = b.dataset.t; rebuild(); });
+  const seg = $("#segMode");
+  if (seg) seg.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; st.str.mode = b.dataset.v; seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); rebuild(); });
+}
+function selectTab(id){
+  st.tab = id; drawTabs(); drawStatic(); wireSetup(); rebuild();
+}
+$("#tabs").addEventListener("click", e => { const b = e.target.closest(".tab"); if (b) selectTab(b.dataset.id); });
+$("#bStart").addEventListener("click", () => { stop(); go(0); });
+$("#bBack").addEventListener("click", () => { stop(); go(st.idx - 1); });
+$("#bNext").addEventListener("click", () => { stop(); go(st.idx + 1); });
+$("#bPlay").addEventListener("click", play);
+$("#scrub").addEventListener("input", e => { stop(); go(+e.target.value); });
+$("#chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (b){ stop(); go(+b.dataset.i); } });
+$("#speed").addEventListener("input", e => { $("#speedv").textContent = e.target.value + " ms"; if (st.timer){ stop(); play(); } });
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input[type=text]")) return;
+  if (e.key === "ArrowRight"){ e.preventDefault(); stop(); go(st.idx + 1); }
+  if (e.key === "ArrowLeft"){ e.preventDefault(); stop(); go(st.idx - 1); }
+});
+selectTab("str");
+})();
+</script>
+</body>
+</html>

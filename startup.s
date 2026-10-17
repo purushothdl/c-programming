@@ -14,7 +14,7 @@
 .word _estack                /* 0x00  initial stack pointer  */
 .word Reset_Handler          /* 0x04  reset                  */
 .word Default_Handler        /* 0x08  NMI                    */
-.word Default_Handler        /* 0x0C  HardFault              */
+.word HardFault_Handler      /* 0x0C  HardFault              */
 .word Default_Handler        /* 0x10  MemManage              */
 .word Default_Handler        /* 0x14  BusFault               */
 .word Default_Handler        /* 0x18  UsageFault             */
@@ -88,3 +88,7 @@ Default_Handler:
 
 .weak USART2_IRQHandler
 .thumb_set USART2_IRQHandler, Default_Handler
+
+/* Only programs that need fault reports define HardFault_Handler. */
+.weak HardFault_Handler
+.thumb_set HardFault_Handler, Default_Handler
