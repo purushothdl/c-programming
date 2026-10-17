@@ -11,7 +11,8 @@ Board and chip documentation: `docs/` and the RM0390/UM1724 PDFs.
 startup.s      reset handler + vector table, shared by every program
 linker.ld      Flash/RAM memory layout, shared by every program
 cmsis/         CMSIS core + STM32F446xx device headers
-programs/      firmware you flash to the board, one flat <name>.c per program
+programs/      firmware you flash to the board: <name>.c, or <name>/ with a main.c
+lib/           shared modules (ring buffer, formatting, UART driver) for the folder programs
 examples/      C sources compiled to assembly for study, never flashed
 build/         generated output, mirrors programs/ and examples/, gitignored
 ```
@@ -50,9 +51,11 @@ These are compiled with `-S` only. Nothing is linked or flashed.
 
 ## Adding a new program
 
-1. Create `programs/<name>.c` (needs a `int main(void)`).
-2. That's it: the Makefile discovers `programs/*.c`, so `make <name>` works
-   immediately.
+1. Create `programs/<name>.c` (needs a `int main(void)`), or a folder
+   `programs/<name>/` containing a `main.c` and any other `.c` files.
+2. That's it: the Makefile discovers both forms, so `make <name>` works
+   immediately. A folder program is built from every `.c` in its folder plus
+   every `.c` in `lib/` (unused code is dropped by `--gc-sections`).
 
 ## Adding a new example
 
