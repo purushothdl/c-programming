@@ -105,3 +105,12 @@ void USART2_IRQHandler(void)
         }
     }
 }
+
+/* HardFault only: the TX interrupt can no longer run, so send what is still queued by polling. */
+void uart_drain_polled(void)
+{
+    USART2->CR1 &= ~USART_CR1_TXEIE;          /* the ISR must not touch the ring any more */
+    while (!ring_empty(&g_tx)) {
+        fault_putc((char)ring_pop(&g_tx));
+    }
+}

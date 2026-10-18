@@ -56,6 +56,8 @@ void hardfault_report(uint32_t *frame, uint32_t exc_return)
     uint32_t bfar = SCB->BFAR;
     uint32_t count = sizeof g_cfsr_bits / sizeof g_cfsr_bits[0];
 
+    uart_drain_polled();  /* send any bytes still queued in the TX ring */
+
     print_str(fault_putc, "\r\n*** HARDFAULT ***\r\n");
 
     print_str(fault_putc, "CFSR  = "); print_hex32(fault_putc, cfsr);

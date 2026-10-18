@@ -28,4 +28,7 @@ uint8_t uart_rx_pop(void);
 void fault_putc(char c);
 void fault_flush(void);
 
+/* Finish polling existing bytes in buffer in the HardFault handler */
+void uart_drain_polled(void);
+
 #endif
