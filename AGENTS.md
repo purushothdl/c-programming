@@ -33,3 +33,8 @@ to find the chapter/section/table. Do not dump full TOCs into context; query on 
 - When starting work on a register/peripheral, look it up from the SVD first; do not guess addresses or bit positions.
 - Core peripherals (NVIC, SCB, SysTick, MPU, FPU) and ARM instruction/exception details come from PM0214, not RM0390; ST peripherals (RCC, GPIO, USART...) come from RM0390.
 - For prose/sequences beyond the SVD (clock tree, AF mapping, programming steps), consult the reference manual via `pdf-mcp` — see `docs/contents.md` for the doc index.
+
+## Skills
+
+- To write a program or module (or when given a "what to do next" brief), follow `.claude/skills/write-module/SKILL.md`.
+- To explain a register or hardware behaviour, follow `.claude/skills/explain-hardware/SKILL.md`.

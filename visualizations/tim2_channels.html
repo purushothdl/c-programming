@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer Channel Path</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EEF0; --panel:#F7FAFB; --ink:#1B2A33; --muted:#566872; --line:#B4C1C8; --soft:#D9E2E6;
+  --c1:#7A2E8E; --c2:#0E7C66; --c3:#B45309; --c4:#1D5FA8;
+  --ui:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0F171C; --panel:#162229; --ink:#E3ECF0; --muted:#8FA2AD; --line:#33454E; --soft:#223038;
+    --c1:#D79BEA; --c2:#5FD3B8; --c3:#F0B26A; --c4:#7FB6F2; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--ui)}
+.wrap{max-width:1040px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:clamp(28px,4.5vw,46px);line-height:1.05;letter-spacing:-.025em;font-weight:800;margin:0 0 6px}
+.lead{color:var(--muted);font-size:17px;margin:0 0 20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.mono{font-family:var(--mono)}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px;border-radius:6px}
+button{font:inherit;color:inherit;cursor:pointer}
+
+/* channel tabs */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.tab{font:700 14px var(--ui);padding:7px 16px;border-radius:999px;border:2px solid var(--line);background:var(--bg)}
+.tab[aria-pressed="true"]{color:var(--bg);border-color:transparent}
+.tab[data-n="1"][aria-pressed="true"]{background:var(--c1)}.tab[data-n="2"][aria-pressed="true"]{background:var(--c2)}
+.tab[data-n="3"][aria-pressed="true"]{background:var(--c3)}.tab[data-n="4"][aria-pressed="true"]{background:var(--c4)}
+.spacer{flex:1}
+.ctl{font:600 13px var(--ui);color:var(--muted);display:flex;gap:8px;align-items:center}
+.ctl button{padding:6px 12px;border-radius:9px;border:1.5px solid var(--line);background:var(--bg);font-weight:600}
+input[type=range]{accent-color:var(--ink);width:110px}
+
+/* counter strip */
+.strip{display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin:6px 0 4px}
+.cell{height:34px;border-radius:6px;background:var(--soft);border:0;position:relative;font:600 11px var(--mono);color:var(--muted);padding:0}
+.cell.below{background:color-mix(in srgb,var(--c) 30%,var(--soft))}
+.cell.now{outline:3px solid var(--ink);outline-offset:1px;color:var(--ink);z-index:1}
+.cell.mark::before{content:"";position:absolute;left:-3px;top:-8px;bottom:-8px;width:4px;border-radius:2px;background:var(--c)}
+.striplab{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:16px}
+.striplab b{color:var(--ink)}
+.stepper{display:inline-flex;gap:6px;align-items:center}
+.stepper button{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);font-weight:800;padding:0}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0}
+.blk{background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;min-width:0}
+.blk .tag{font:600 11px var(--mono);color:var(--muted);text-align:center}
+.blk .tag b{color:var(--c)}
+.blk .state{font:700 14px var(--ui)}
+.rule{flex:1.3}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:5px;width:100%}
+.chip{font:600 12px var(--ui);padding:6px 4px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel)}
+.chip[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--bg)}
+.sw{flex:1;cursor:pointer}
+.sw:hover{border-color:var(--c)}
+.sw svg{width:100%;max-width:130px;height:auto}
+.sw .st{stroke:var(--ink);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sw .dot{fill:var(--ink)}
+.pinblk{flex:1}
+.led{width:54px;height:54px;border-radius:50%;border:3px solid var(--c);background:var(--c);opacity:.08;transition:opacity .15s,box-shadow .15s}
+.pct{font:800 24px var(--mono)}
+.wire{flex:0 0 46px;position:relative;display:flex;align-items:center}
+.wire::before{content:"";height:5px;width:100%;background:var(--line);border-radius:3px;transition:background .08s}
+.wire.hi::before{background:var(--c);box-shadow:0 0 10px var(--c)}
+.wire span{position:absolute;top:calc(50% - 26px);left:50%;transform:translateX(-50%);font:600 11px var(--mono);color:var(--muted);white-space:nowrap}
+@media (max-width:820px){
+  .pipe{flex-direction:column;align-items:stretch}
+  .wire{flex:0 0 36px;justify-content:center}
+  .wire::before{height:100%;width:5px}
+  .wire span{top:50%;left:18px;transform:translateY(-50%)}
+}
+
+/* analyzer */
+canvas{width:100%;height:230px;display:block}
+.cap{font-size:13px;color:var(--muted);margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Counter to pin</h1>
+  <p class="lead">One channel, step by step. Change one thing and watch where the signal changes.</p>
+
+  <div class="panel" id="stage" style="--c:var(--c1)">
+    <div class="tabs">
+      <button class="tab" data-n="1" aria-pressed="true">CH1</button>
+      <button class="tab" data-n="2" aria-pressed="false">CH2</button>
+      <button class="tab" data-n="3" aria-pressed="false">CH3</button>
+      <button class="tab" data-n="4" aria-pressed="false">CH4</button>
+      <span class="spacer"></span>
+      <span class="ctl"><button id="play" aria-pressed="true">Pause</button>
+        <label>speed <input id="spd" type="range" min="1" max="12" value="4"></label></span>
+    </div>
+
+    <div class="strip" id="strip" role="group" aria-label="Counter ticks 0 to 19. Click a tick to set the compare value."></div>
+    <div class="striplab">
+      <span>counter now = <b class="mono" id="cnt">0</b></span>
+      <span>compare value
+        <span class="stepper"><button id="dec" aria-label="decrease CCR">−</button><b class="mono" id="ccrv">5</b><button id="inc" aria-label="increase CCR">+</button></span>
+        <span class="mono" id="ccrname">CCR1</span></span>
+    </div>
+
+    <div class="pipe">
+      <div class="blk rule">
+        <span class="tag"><b id="t_rule">OC1M</b> · <span id="t_ccmr">CCMR1</span> · the rule</span>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="wire" id="w1"><span id="t_ref">OC1REF</span></div>
+      <button class="blk sw" id="pol" aria-pressed="false">
+        <span class="tag"><b id="t_p">CC1P</b> · CCER · polarity</span>
+        <svg viewBox="0 0 130 50" aria-hidden="true"><g id="polsvg"></g></svg>
+        <span class="state" id="polst">keep</span>
+      </button>
+      <div class="wire" id="w2"></div>
+      <button class="blk sw" id="en" aria-pressed="true">
+        <span class="tag"><b id="t_e">CC1E</b> · CCER · enable</span>
+        <svg viewBox="0 0 130 50" aria-hidden="true"><g id="ensvg"></g></svg>
+        <span class="state" id="enst">connected</span>
+      </button>
+      <div class="wire" id="w3"><span>pin</span></div>
+      <div class="blk pinblk">
+        <span class="tag">PIN · high for</span>
+        <div class="led" id="led"></div>
+        <span class="pct" id="pct">25%</span>
+        <span class="tag" id="from">rule says 25%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <canvas id="an" aria-label="Pin signals of all four channels over time"></canvas>
+    <p class="cap">Same counter, four pins. The selected channel also shows its OCREF wire (dashed) before the gate.</p>
+  </div>
+</div>
+
+<script>
+const ARR=19, N=20, WIN=40;
+const chans=[
+  {ccr:5, mode:'110',e:1,p:0},
+  {ccr:10,mode:'110',e:1,p:0},
+  {ccr:15,mode:'110',e:1,p:1},
+  {ccr:10,mode:'110',e:0,p:0},
+];
+const MODES=[['110','PWM 1'],['111','PWM 2'],['100','force low'],['101','force high']];
+const $=s=>document.querySelector(s);
+let sel=0;
+
+const ref=(c,k)=>c.mode==='110'?+(k<c.ccr):c.mode==='111'?+!(k<c.ccr):c.mode==='101'?1:0;
+const after=(c,k)=>ref(c,k)^c.p;
+const pin=(c,k)=>c.e?after(c,k):0;
+const ruleDuty=c=>c.mode==='110'?Math.min(c.ccr,N)/N:c.mode==='111'?1-Math.min(c.ccr,N)/N:c.mode==='101'?1:0;
+const pinDuty=c=>c.e?(c.p?1-ruleDuty(c):ruleDuty(c)):0;
+
+// ---- static builds
+$('#strip').innerHTML=Array.from({length:N},(_,k)=>`<button class="cell" data-k="${k}">${k}</button>`).join('');
+$('#chips').innerHTML=MODES.map(([v,l])=>`<button class="chip" data-v="${v}">${l}<br><span class="mono">${v}</span></button>`).join('');
+const cells=[...document.querySelectorAll('.cell')];
+
+function polSvg(p){
+  return p
+   ?`<path class="st" d="M4 25H38M38 8V42L72 25Z M72 25H78"/><circle cx="84" cy="25" r="6" fill="none" class="st"/><path class="st" d="M90 25H126"/>`
+   :`<path class="st" d="M4 25H126"/>`;
+}
+function enSvg(e){
+  return `<path class="st" d="M4 25H34"/><circle class="dot" cx="34" cy="25" r="4"/><circle class="dot" cx="96" cy="25" r="4"/><path class="st" d="M96 25H126"/>`+
+   (e?`<path class="st" d="M34 25L96 25"/>`:`<path class="st" d="M34 25L88 6"/>`);
+}
+
+function render(){
+  const c=chans[sel],n=sel+1;
+  $('#stage').style.setProperty('--c',`var(--c${n})`);
+  document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.n===n));
+  $('#ccrv').textContent=c.ccr; $('#ccrname').textContent='CCR'+n;
+  $('#t_rule').textContent='OC'+n+'M'; $('#t_ccmr').textContent=n<3?'CCMR1':'CCMR2';
+  $('#t_ref').textContent='OC'+n+'REF'; $('#t_p').textContent='CC'+n+'P'; $('#t_e').textContent='CC'+n+'E';
+  document.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===c.mode));
+  $('#polsvg').innerHTML=polSvg(c.p); $('#polst').textContent=c.p?'flip (CC'+n+'P=1)':'keep (CC'+n+'P=0)';
+  $('#pol').setAttribute('aria-pressed',!!c.p);
+  $('#ensvg').innerHTML=enSvg(c.e); $('#enst').textContent=c.e?'connected':'cut off (idle low)';
+  $('#en').setAttribute('aria-pressed',!!c.e);
+  const rd=Math.round(ruleDuty(c)*100), pd=Math.round(pinDuty(c)*100);
+  $('#pct').textContent=pd+'%';
+  $('#from').textContent=pd===rd?`rule says ${rd}%`:`rule said ${rd}%`;
+  cells.forEach((el,k)=>{
+    const lowSide=c.mode==='110'?k<c.ccr:c.mode==='111'?k>=c.ccr:false;
+    el.classList.toggle('below',lowSide);
+    el.classList.toggle('mark',k===c.ccr);
+  });
+}
+
+// ---- inputs
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{sel=+b.dataset.n-1;render()});
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{chans[sel].mode=b.dataset.v;render()});
+cells.forEach(el=>el.onclick=()=>{chans[sel].ccr=+el.dataset.k;render()});
+$('#dec').onclick=()=>{const c=chans[sel];c.ccr=Math.max(0,c.ccr-1);render()};
+$('#inc').onclick=()=>{const c=chans[sel];c.ccr=Math.min(20,c.ccr+1);render()};
+$('#pol').onclick=()=>{chans[sel].p^=1;render()};
+$('#en').onclick=()=>{chans[sel].e^=1;render()};
+let playing=true;
+$('#play').onclick=e=>{playing=!playing;e.target.setAttribute('aria-pressed',playing);e.target.textContent=playing?'Pause':'Play'};
+
+// ---- time + history
+const hist={}; // absolute tick -> {ref:[], pin:[]}
+const snap=T=>{const k=((T%N)+N)%N;hist[T]={pin:chans.map(c=>pin(c,k)),raw:chans.map(c=>ref(c,k))};delete hist[T-WIN-5]};
+for(let j=-WIN;j<0;j++)snap(j);
+let t=0,lastT=-1,last=performance.now(),avg=0;
+
+const canvas=$('#an'),ctx=canvas.getContext('2d');
+function fit(){const r=devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;canvas.width=w*r;canvas.height=h*r;ctx.setTransform(r,0,0,r,0,0)}
+addEventListener('resize',fit);fit();
+
+function draw(){
+  const W=canvas.clientWidth,H=canvas.clientHeight,cs=getComputedStyle(document.documentElement);
+  const col=n=>cs.getPropertyValue('--c'+n).trim(),ink=cs.getPropertyValue('--ink').trim(),line=cs.getPropertyValue('--line').trim(),muted=cs.getPropertyValue('--muted').trim();
+  ctx.clearRect(0,0,W,H);
+  const left=58,pw=W-left-8,rows=5,rh=H/rows,T=Math.floor(t);
+  const X=j=>left+pw*(1-(t-j)/WIN);
+  ctx.font='600 12px JetBrains Mono, monospace';ctx.textBaseline='middle';
+  // period boundaries
+  ctx.strokeStyle=line;ctx.lineWidth=1;ctx.setLineDash([2,4]);
+  for(let j=Math.ceil(t-WIN);j<=T;j++){ if(((j%N)+N)%N===0){const x=X(j);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}}
+  ctx.setLineDash([]);
+  const trace=(row,color,get,w,dash)=>{
+    const y0=row*rh+rh*0.78,y1=row*rh+rh*0.22;
+    ctx.strokeStyle=color;ctx.lineWidth=w;ctx.setLineDash(dash||[]);ctx.beginPath();
+    let first=true;
+    for(let j=Math.max(Math.floor(t-WIN),T-WIN);j<=T;j++){
+      const h=hist[j];if(!h)continue;
+      const xa=Math.max(left,X(j)),xb=Math.min(left+pw,j===T?X(t):X(j+1)),y=get(h)?y1:y0;
+      if(first){ctx.moveTo(xa,y);first=false}else ctx.lineTo(xa,y);
+      ctx.lineTo(xb,y);
+    }
+    ctx.stroke();ctx.setLineDash([]);
+  };
+  // row 0: selected channel OCREF/after-polarity ghost
+  ctx.fillStyle=muted;ctx.fillText('OC'+(sel+1)+'REF',4,rh*0.5);
+  trace(0,col(sel+1),h=>h.raw[sel],2,[5,4]);
+  for(let i=0;i<4;i++){
+    const row=i+1,active=i===sel;
+    ctx.globalAlpha=active?1:0.55;
+    ctx.fillStyle=col(i+1);ctx.fillText('CH'+(i+1)+' pin',4,row*rh+rh*0.5);
+    trace(row,col(i+1),h=>h.pin[i],active?3:2);
+    ctx.globalAlpha=1;
+  }
+  // now line
+  ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(left+pw,0);ctx.lineTo(left+pw,H);ctx.stroke();
+}
+
+function frame(now){
+  const dt=(now-last)/1000;last=now;
+  if(playing)t+=dt*$('#spd').value;
+  const T=Math.floor(t);
+  while(lastT<T){lastT++;snap(lastT)}   // history records the settings in force at each tick
+  const k=((T%N)+N)%N,c=chans[sel];
+  cells.forEach((el,i)=>el.classList.toggle('now',i===k));
+  $('#cnt').textContent=k;
+  const r=ref(c,k),a=after(c,k),p=pin(c,k);
+  $('#w1').classList.toggle('hi',!!r);
+  $('#w2').classList.toggle('hi',!!a);
+  $('#w3').classList.toggle('hi',!!p);
+  avg+=(p-avg)*Math.min(1,dt*6);
+  const led=$('#led');led.style.opacity=.08+.92*avg;led.style.boxShadow=`0 0 ${avg*28}px var(--c)`;
+  draw();
+  requestAnimationFrame(frame);
+}
+render();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
