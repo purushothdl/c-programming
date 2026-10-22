@@ -5,18 +5,39 @@
  *
  * TIM2 runs from APB1. At reset the APB1 prescaler is /1, so the timer clock is
  * 16 MHz (HSI) (RM0390 6.2: TIMxCLK = PCLKx when the APB prescaler is 1).
+ * 
+ * Example values below give a 1 Hz PWM with 50 % duty cycle:
+ *   tick   = 16 MHz / (PSC + 1) = 16 MHz / 16000 = 1 kHz    (1 ms per tick)
+ *   period = (ARR + 1) ticks    = 1000 ticks               = 1 s -> 1 Hz
+ *   duty   = CCR1 / (ARR + 1)   = 500 / 1000               = 50 %
  *
- *   tick   = 16 MHz / (PSC + 1) = 16 MHz / 6400 = 2500 Hz   (0.4 ms per tick)
- *   period = (ARR + 1) ticks    = 50 ticks                 = 20 ms -> 50 Hz
- *   duty   = CCR1 / (ARR + 1)   = 25 / 50                  = 50 %
- *
- * Slow motion: PSC = 63999 gives 250 Hz ticks, a 5 Hz period, and a visible blink.
+ * 1 Hz is slow enough to see as a blink: 0.5 s on, 0.5 s off.
  */
 
-#define TIM2_PSC   6399u                    /* divide 16 MHz by 6400 */
-#define TIM2_ARR   49u                      /* 50 ticks per period, 50 duty steps */
-#define TIM2_CCR1  25u                      /* high for 25 of the 50 ticks */
-#define PA5_AF_TIM2_CH1 1u                  /* datasheet table 11 */
+#define TIM2_PSC   15u                   /* divide 16 MHz by 16 */
+#define TIM2_ARR   999u                  /* 1000 ticks per period, 1000 duty steps */
+#define TIM2_CCR1  0u                    /* high for 0 of the 1000 ticks */
+#define PA5_AF_TIM2_CH1 1u               /* datasheet table 11 */
+
+#define CPU_CLK_HZ 16000000u
+
+static void systick_init(void)
+{
+    /* No interrupt here: delay_ms() polls COUNTFLAG. */
+    SysTick->LOAD = (CPU_CLK_HZ / 1000u) - 1u;
+    SysTick->VAL = 0u;
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
+}
+
+static void delay_ms(uint32_t ms)
+{
+    uint32_t i;
+    for (i = 0; i < ms; i++) {
+        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk)) {
+            /* Wait for the SysTick counter to reach zero */
+        }
+    }
+}
 
 static void pwm_pin_init(void)
 {
@@ -58,10 +79,14 @@ static void pwm_init(void)
 
 int main(void)
 {
+    systick_init();
     pwm_pin_init();
     pwm_init();
 
     for (;;) {
-        __WFI();                            /* the timer drives the pin by itself */
+        for (uint32_t i = 0; i < 41; i++) {
+            TIM2->CCR1 = i * 25u;   /* 0, 25, 50, ..., 1000 */
+            delay_ms(50u);
+        }
     }
 }
