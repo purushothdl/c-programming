@@ -35,6 +35,10 @@
 .word USART2_IRQHandler      /* 0xD8  USART2 (IRQ 38) */
 .word Default_Handler        /* 0xDC  IRQ 39 (no handler yet) */
 .word EXTI15_10_IRQHandler   /* 0xE0  EXTI15_10 (IRQ 40) */
+.rept 9                      /* 0xE4..0x104  IRQ 41..49 (no handler yet) */
+.word Default_Handler
+.endr
+.word TIM5_IRQHandler        /* 0x108 TIM5 (IRQ 50) */
 
 .section .text.Reset_Handler, "ax", %progbits
 .thumb_func
@@ -88,6 +92,9 @@ Default_Handler:
 
 .weak USART2_IRQHandler
 .thumb_set USART2_IRQHandler, Default_Handler
+
+.weak TIM5_IRQHandler
+.thumb_set TIM5_IRQHandler, Default_Handler
 
 /* Only programs that need fault reports define HardFault_Handler. */
 .weak HardFault_Handler

@@ -29,6 +29,8 @@ void pwm_init(uint32_t duty)
 {
     pwm_pin_init();
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM2_STOP;   /* stop TIM2 while the core is halted */
+
 
     /* PSC, ARR and CCR1 are preloaded: these writes reach the live registers
        only on an update event (forced below). */
