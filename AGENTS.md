@@ -38,3 +38,4 @@ to find the chapter/section/table. Do not dump full TOCs into context; query on 
 
 - To write a program or module (or when given a "what to do next" brief), follow `.claude/skills/write-module/SKILL.md`.
 - To explain a register or hardware behaviour, follow `.claude/skills/explain-hardware/SKILL.md`.
+- To build an interactive lesson page (sequences, register builders, labs) in `visualizations/`, follow `.claude/skills/visualize-concept/SKILL.md`.

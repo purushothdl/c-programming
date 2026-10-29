@@ -7,7 +7,8 @@
      src: [[lineNo, text], ...],            // default source; [0,''] draws a gap
      lines: { scenarioId: [[lineNos], ...] }, // optional; or put `lines` on each step
      derive: function (state) { return { label: value }; }, // optional extra Watch rows
-     file: 'main.c', key: 'storage-key'
+     file: 'main.c', key: 'storage-key',
+     watch: false, code: false   // optional: drop the Watch table and/or the Code sheet (toggles included)
    });
    Step: { f, t, label, kind: ''|'irq'|'ret'|'good'|'bad', title, desc, code, set, lines, note, noteAt, verdict, verdictText }
    ctl.setScenario(index, scenario) swaps one scenario (for input-driven pages); ctl.select(index). */
@@ -45,7 +46,8 @@
     var tabs = q('.top'), grid = q('.seq'), svg = q('.main-svg'), foot = q('.foot-svg'), sp = q('.sp'), diagramEl = q('.diagram');
     var scenarios = cfg.scenarios.slice();
     var sc = scenarios[0], cur = 0, timer = null;
-    var sheetOpen = innerWidth >= 900, watchOpen = true;
+    var useCode = cfg.code !== false, useWatch = cfg.watch !== false;
+    var sheetOpen = useCode && innerWidth >= 900, watchOpen = useWatch;
     var W = 760, X0 = 76, DX = 152, BOXW = 116, TOP = 62, ROW = 42, lanes = cfg.lanes, laneIdx = {};
     var msgEls = [], lnEls = {}, tabEls = [];
     q('.sheet-file').textContent = cfg.file || 'source';
@@ -57,6 +59,19 @@
       var l = cfg.lines && cfg.lines[sc.id];
       return (l && l[i]) || [];
     }
+    /* console warnings for the mistakes that otherwise fail silently (see lessons.md, "seq.js gotchas") */
+    function lint(s) {
+      var have = {}, bad = [];
+      (s.src || cfg.src || []).forEach(function (r) { have[r[0]] = 1; });
+      var per = cfg.lines && cfg.lines[s.id];
+      if (per && per.length !== s.steps.length) console.warn('Seq: scenario "' + s.id + '" has ' + s.steps.length + ' steps but cfg.lines has ' + per.length + ' entries (lines are positional)');
+      s.steps.forEach(function (st, i) {
+        (st.lines || (per && per[i]) || []).forEach(function (n) { if (!have[n]) bad.push('step ' + (i + 1) + ' line ' + n); });
+      });
+      (s.dim || []).forEach(function (n) { if (!have[n]) bad.push('dim line ' + n); });
+      if (bad.length) console.warn('Seq: scenario "' + s.id + '" highlights lines that are not in its src, so nothing lights up: ' + bad.join(', '));
+    }
+    scenarios.forEach(lint);
     function laneX(id) { return X0 + laneIdx[id] * DX; }
     function stateAt(n) {
       var st = {}, k, i;
@@ -87,10 +102,15 @@
     }
     var tgWatch = function () { watchOpen = !watchOpen; relayout(); }; tgWatch.state = function () { return watchOpen; };
     var tgCode = function () { sheetOpen = !sheetOpen; build(); update(true); }; tgCode.state = function () { return sheetOpen; };
-    toggle('Watch', 'Show or hide register values (changed values stay as chips)', true, tgWatch);
-    toggle('{ } Code', 'Show or hide the source', sheetOpen, tgCode);
+    if (useWatch) toggle('Watch', 'Show or hide register values (changed values stay as chips)', true, tgWatch);
+    if (useCode) toggle('{ } Code', 'Show or hide the source', sheetOpen, tgCode);
 
     /* ----- layout and drawing ----- */
+    /* shrink a label's font until it fits inside its lane box (SVG text cannot wrap) */
+    function fitText(el, max) {
+      var len = el.getComputedTextLength ? el.getComputedTextLength() : 0;
+      if (len > max) el.style.fontSize = Math.max(7, parseFloat(getComputedStyle(el).fontSize) * max / len) + 'px';
+    }
     function layout() {
       var dw = diagramEl.clientWidth || 740;
       W = Math.max(500, Math.min(760, Math.floor((dw - 12) / 20) * 20));
@@ -98,7 +118,7 @@
       lanes = sc.lanes || cfg.lanes; laneIdx = {};
       lanes.forEach(function (l, i) { laneIdx[l.id] = i; });
       DX = lanes.length > 1 ? (W - 2 * X0) / (lanes.length - 1) : 0;
-      grid.className = 'seq' + (sheetOpen ? ' open' : '') + (watchOpen ? '' : ' nowatch');
+      grid.className = 'seq' + (sheetOpen ? ' open' : '') + (watchOpen ? '' : ' nowatch') + (useCode ? '' : ' nocode');
     }
     function relayout() { var prev = W; layout(); if (W !== prev) { build(); update(true); } }
 
@@ -128,8 +148,7 @@
         [[svg, 6], [foot, 6]].forEach(function (p) {
           if (p[0] === foot) p[0].appendChild(svgEl('line', { x1: x, y1: 0, x2: x, y2: 6, 'class': 'life' }));
           p[0].appendChild(svgEl('rect', { x: x - BOXW / 2, y: 6, width: BOXW, height: 38, rx: 4, 'class': 'lane-box' }));
-          p[0].appendChild(svgEl('text', { x: x, y: 22, 'class': 'lane-t' }, l.t));
-          p[0].appendChild(svgEl('text', { x: x, y: 36, 'class': 'lane-s' }, l.s));
+          [[22, 'lane-t', l.t], [36, 'lane-s', l.s]].forEach(function (r) { fitText(p[0].appendChild(svgEl('text', { x: x, y: r[0], 'class': r[1] }, r[2])), BOXW - 12); });
         });
         var li = document.createElement('i'); li.style.left = (x / W * 100) + '%'; sp.appendChild(li);
       });
@@ -239,7 +258,7 @@
       select: select,
       setScenario: function (i, s) {
         var wasCur = scenarios[i] === sc;
-        scenarios[i] = s; buildTabs();
+        scenarios[i] = s; lint(s); buildTabs();
         if (wasCur) { sc = s; cur = 0; stop(); build(); update(true); }
       },
       goto: function (n) { cur = Math.max(0, Math.min(sc.steps.length, n)); update(true); }

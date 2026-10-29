@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LED fade, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.fade{display:grid;grid-template-columns:190px 1fr;gap:18px;align-items:center}
+@media (max-width:700px){.fade{grid-template-columns:1fr}}
+.ledbox{display:grid;place-items:center;gap:10px}
+.led{width:120px;height:120px;border-radius:50%;border:1px solid var(--line);background:var(--ember);opacity:.08;transition:opacity .1s linear}
+.ledcap{font:400 10px "JetBrains Mono",monospace;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+#pwm{width:100%;height:150px;display:block}
+.rampstrip{display:grid;grid-template-columns:repeat(41,1fr);gap:1px;margin:12px 0 4px}
+.rcell{height:30px;border:0;border-radius:1px;background:var(--card-2);padding:0;cursor:pointer;position:relative}
+.rcell[aria-current="true"]{outline:2px solid var(--ink);outline-offset:1px;z-index:1}
+.meter{display:grid;gap:6px;margin:10px 0 0}
+.mrow{display:grid;grid-template-columns:74px 1fr 86px;gap:10px;align-items:center;font:400 11px "JetBrains Mono",monospace;color:var(--ink-3)}
+.mtrack{height:12px;background:var(--card-2);border:1px solid var(--line-2);border-radius:2px;overflow:hidden}
+.mfill{height:100%;background:var(--ink-3)}
+.mfill.duty{background:var(--ember)}
+.mval{text-align:right;color:var(--ink)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">tim_pwm_fade <span>a ramp, not a blink</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#fade">The ramp</a>
+    <a class="l" href="#timing">Ramp time</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/tim_pwm_fade/main.c · lib/pwm.c</div>
+    <h1 style="margin-top:14px">The duty climbs in straight steps. <em>The light does not.</em></h1>
+    <p class="serif">TIM2 makes a 1 kHz square wave on PA5, so the LED never flickers. Every 50 ms main adds 25 to CCR1: 0 to 1000 in 2.05 s, then it starts again. The duty is linear. What your eye receives is a curve.</p>
+    <div class="cta">
+      <a class="btn dark" href="#fade">Watch one cycle →</a>
+      <a class="btn" href="channels.html">The PWM path</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Timer</span><b>TIM2_CH1 · PA5</b></div>
+    <div><span>PWM</span><b>1 kHz · 1 ms period</b></div>
+    <div><span>Tick</span><b>1 µs (PSC 15)</b></div>
+    <div><span>Period</span><b>1000 ticks (ARR 999)</b></div>
+    <div><span>Resolution</span><b>1000 steps · 0.1%</b></div>
+    <div><span>Fade step</span><b>+25 · 2.5%</b></div>
+    <div><span>Step time</span><b>50 ms</b></div>
+    <div><span>Cycle</span><b>41 writes · 2 050 ms</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s"><i>CODE 1</i><b>for duty += 25</b><span>0 … 1000, 41 values</span></div>
+  <div class="s"><i>CODE 2</i><b>pwm_set_duty</b><span>CCR1 = duty, preloaded</span></div>
+  <div class="s hw"><i>HW 3</i><b>TIM2 compare</b><span>high while CNT &lt; CCR1</span></div>
+  <div class="s hw"><i>HW 4</i><b>PA5</b><span>high for duty µs per 1 ms</span></div>
+  <div class="s hw"><i>HW 5</i><b>1 kHz light</b><span>too fast to flicker</span></div>
+  <div class="s"><i>EYE 6</i><b>Perceived level</b><span>≈ duty<sup>1/2.2</sup>, not duty</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C · EYE = what you see</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div>
+    <h2>One step of the ramp</h2>
+    <p>The first tab is a normal duty change. The second is the top of the cycle, where the loop restarts at 0. The third is a bug tab: without <code>OC1PE</code>, a new duty takes effect in the middle of a pulse.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="fade">
+  <div class="sh"><div class="eyebrow">02 · one cycle · simplified eye model</div>
+    <h2>Two seconds of light</h2>
+    <p>Press play or drag the time. The waveform is two real periods at the current duty. The ring is the same light after the eye's response: a simple <code>duty<sup>1/2.2</sup></code> model, not a measurement.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <button class="btn sm dark" id="play">Play</button>
+      <label>Time <input type="range" id="t" min="0" max="2049" value="0" aria-label="Milliseconds into the fade"></label>
+      <span class="win-val" id="tv"></span>
+      <button class="btn sm ghost" id="loop">Jump to the restart</button>
+    </div>
+    <div class="fade">
+      <div class="ledbox">
+        <div class="led" id="led"></div>
+        <div class="ledcap" id="step">step 0 / 40</div>
+      </div>
+      <div>
+        <canvas id="pwm" aria-label="Two PWM periods at the current duty"></canvas>
+        <div class="meter">
+          <div class="mrow"><span>duty</span><div class="mtrack"><div class="mfill duty" id="bduty"></div></div><span class="mval" id="vduty">0%</span></div>
+          <div class="mrow"><span>perceived</span><div class="mtrack"><div class="mfill" id="bperc"></div></div><span class="mval" id="vperc">0%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="rampstrip" id="strip" role="group" aria-label="The 41 duty steps of one fade"></div>
+    <p class="hint" id="fhint"></p>
+  </div></div>
+</section>
+
+<section id="timing">
+  <div class="sh"><div class="eyebrow">03 · the numbers</div>
+    <h2>How long should the fade take?</h2>
+    <p>Two constants set the whole ramp: the step size and the wait after each step. The loop writes <code>0 … 1000</code> inclusive, so a step that divides 1000 gives 41 writes.</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>Ramp calculator <span>PWM_STEPS = 1000</span></h3>
+      <div class="inl">Step <input type="number" id="fstep" value="25" min="1" max="500" step="1">
+        <button class="btn sm ghost" data-s="25">25</button><button class="btn sm ghost" data-s="10">10</button><button class="btn sm ghost" data-s="50">50</button></div>
+      <div class="inl">Wait <input type="number" id="fms" value="50" min="5" max="500" step="5"> ms</div>
+      <div class="big" id="cyc"></div>
+      <div class="kv" id="kv-ramp"></div>
+      <div class="warnbox" id="rampwarn">This step does not divide 1000, so the last value lands below 100 %. The LED never reaches full brightness.</div>
+    </div>
+    <div class="card">
+      <h3>What stays fixed <span>lib/pwm.c</span></h3>
+      <div class="kv" id="kv-fixed"></div>
+      <p class="hint" style="margin-top:10px">The fader only moves <code>CCR1</code>. PSC, ARR and the PWM mode are set once in <code>pwm_init</code>. The pin path (compare → OC1REF → CC1E → PA5) is on the <a href="channels.html">channels page</a>.</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Why the new duty waits for the wrap <span>lib/pwm.c · OC1PE</span></h3>
+    <p style="margin:0 0 8px">With <code>OC1PE = 1</code>, a write to <code>CCR1</code> goes into the preload register and is copied to the active register at the next update event. Without it, the write takes effect at once and can end a pulse early (RM0390 p. 558). That one bit is why a fade never glitches a period.</p>
+    <div class="out" style="margin:0">TIM2-&gt;CCMR1 |= ... | TIM_CCMR1_OC1PE;</div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">04 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>41 writes, not 40</b><code>duty &lt;= 1000</code> includes both ends: 0, 25 … 1000 is 41 values, so the cycle is 2 050 ms.</div>
+    <div><b>The step must divide 1000</b>25, 10 and 50 land on 1000. A step like 30 stops at 990, so the LED never reaches full.</div>
+    <div><b>There is no fade down</b>The inner loop ends and the next pass writes 0. Full to off in one 50 ms step — the jump at the top of every cycle.</div>
+    <div><b>Preload keeps pulses whole</b>With OC1PE = 1 the new duty is copied at the update event. Without it, a write can end a pulse early or late.</div>
+    <div><b>Linear duty, curved light</b>At 2.5 % the eye already sees about 19 % of full. Most of the visible change happens in the first half.</div>
+    <div><b>PA5 is owned</b><code>lib/pwm.c</code> owns TIM2 and PA5. Reconfiguring either elsewhere breaks the fade silently.</div>
+  </div>
+</section>
+
+<footer>Source: programs/tim_pwm_fade/main.c (lines 32–43), lib/pwm.c (lines 28–62), lib/pwm.h · RM0390 §17.4.7 p. 558 (OC1PE), §17.3.9 p. 531 (PWM mode) · SVD: svd/stm32f446re.svd (TIM2, GPIOA)</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence: programs/tim_pwm_fade/main.c ---------- */
+(function () {
+  var SRC = [
+    [10, '#define CPU_CLK_HZ 16000000u'], [11, '#define FADE_STEP  25u'], [12, '#define FADE_MS    50u'],
+    [0, ''],
+    [14, 'static void systick_init(void)'], [17, '    SysTick->LOAD = (CPU_CLK_HZ / 1000u) - 1u;'],
+    [19, '    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;'],
+    [0, ''],
+    [22, 'static void delay_ms(uint32_t ms)'], [25, '    for (i = 0; i < ms; i++) {'],
+    [26, '        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk)) {'],
+    [0, ''],
+    [32, 'int main(void)'], [33, '{'], [34, '    systick_init();'], [35, '    pwm_init(0u);'],
+    [0, ''],
+    [37, '    for (;;) {'],
+    [38, '        for (uint32_t duty = 0u; duty <= PWM_STEPS; duty += FADE_STEP) {'],
+    [39, '            pwm_set_duty(duty);'],
+    [40, '            delay_ms(FADE_MS);'],
+    [41, '        }'], [42, '    }'], [43, '}']
+  ];
+
+  var B = { duty: '475', ccr: '475', active: '475', out: 'high', light: '47.5 %' };
+  function base(o) { var r = {}, k; for (k in B) r[k] = B[k]; for (k in o) r[k] = o[k]; return r; }
+
+  var SCEN = [
+    { id: 'ramp', tab: 'one_step.seq', init: base({}), steps: [
+      { f: 'main', t: 'main', label: '50 ms at 47.5%', title: 'The previous step has finished', desc: 'Each duty lasts 50 PWM periods, so 50 ms. The pin has been repeating the same 475 µs pulse.', code: 'delay_ms(FADE_MS);', lines: [40] },
+      { f: 'main', t: 'tim2', label: 'CCR1 = 500', title: 'main writes the next duty', desc: 'pwm_set_duty writes CCR1. Because OC1PE = 1 in pwm_init, the write lands in the preload register, not the active one.', code: 'pwm_set_duty(duty);', lines: [39], set: { ccr: '500' } },
+      { f: 'tim2', t: 'tim2', label: 'still 475', title: 'The pulse in progress is untouched', desc: 'The active compare value is still 475, so this period ends after 475 µs, exactly as the last one did.', code: '/* hardware */  active CCR1 = 475' },
+      { f: 'tim2', t: 'tim2', label: 'update event', title: 'The wrap copies the new value', desc: 'CNT reaches 999 and wraps. The update event moves 500 from the preload register into the active register. The period is 1 ms, so the wait is under 1 ms.', code: '/* hardware */  preload → active', set: { active: '500', duty: '500' } },
+      { f: 'tim2', t: 'pin', label: 'high 500 µs', title: 'The pulse grows', desc: 'At 1 kHz, 500 of 1000 ticks high is 500 µs per millisecond. The wire never shows the change mid-pulse.', code: '/* hardware */  PA5 high 500 µs', set: { out: 'high' } },
+      { f: 'pin', t: 'led', label: 'a little brighter', kind: 'good', title: 'Light, but not 2.5% brighter', desc: 'The duty rose by 2.5 points. The eye sees a smaller change up here than it did at the bottom of the ramp (model, next section).', code: '/* perceived ≈ duty^1/2.2 */', set: { light: '50 %' }, verdict: 'good', verdictText: 'One write, applied at the next wrap, never in the middle of a pulse.' }
+    ] },
+    { id: 'restart', tab: 'restart.seq', init: base({ duty: '975', ccr: '975', active: '975', light: '97.5 %' }), steps: [
+      { f: 'main', t: 'main', label: '975 → 1000', title: 'The last step of the ramp', desc: 'The loop adds 25 for the 40th time. Duty 1000 means CCR1 is above every counter value.', code: 'for (duty = 0; duty <= PWM_STEPS; duty += 25)', lines: [38], set: { duty: '1000', ccr: '1000', active: '1000' } },
+      { f: 'tim2', t: 'pin', label: 'always high', title: 'Full on', desc: 'In PWM mode 1 the output is high while CNT < CCR1, and CNT never reaches 1000. The pin stays high (RM0390 §17.3.9).', code: '/* hardware */  PA5 = 1', set: { light: '100 %' } },
+      { f: 'main', t: 'main', label: 'delay 50 ms', title: 'Full brightness for 50 ms', desc: 'One step of the ramp is still 50 ms, even at the end.', code: 'delay_ms(FADE_MS);', lines: [40] },
+      { f: 'main', t: 'main', label: 'loop exits', title: 'The inner loop ends', desc: 'The next value would be 1025, above PWM_STEPS, so the inner for exits. The outer for starts again with duty = 0.', code: 'for (;;) { ... }', lines: [37, 41, 42], set: { duty: '0', ccr: '0' } },
+      { f: 'tim2', t: 'tim2', label: 'CCR1 = 0', title: 'The wrap applies zero', desc: 'At the next update event the active compare becomes 0, so the output stays low for the whole period.', code: '/* hardware */  active CCR1 = 0', set: { active: '0', out: 'low' } },
+      { f: 'tim2', t: 'led', label: 'off', kind: 'bad', title: 'Full to off in one step', desc: 'There is no fade down. The cycle ends with a visible jump and starts climbing again from 0.', code: '/* no fade-down path */', set: { light: '0 %' }, verdict: 'bad', verdictText: 'The ramp is 2 050 ms up, then an instant drop to zero. It reads as a flash at the top of every cycle.' }
+    ] },
+    { id: 'nodelay', tab: 'no_delay.seq', bug: true, dim: [40],
+      sheetNote: 'This tab removes line 40, delay_ms(FADE_MS). The ramp then runs at code speed instead of 50 ms per step.',
+      init: base({}), steps: [
+      { f: 'main', t: 'main', label: 'duty = 0', title: 'The ramp starts', desc: 'The first value is written immediately, as in the real code.', code: 'pwm_set_duty(0);', lines: [39], set: { duty: '0', ccr: '0' } },
+      { f: 'main', t: 'main', label: '41 writes, no wait', kind: 'bad', title: 'No delay between steps', desc: 'Without line 40 the loop runs at code speed: 41 writes finish in a few hundred microseconds, well inside one PWM period.', code: 'for (duty = 0; duty <= 1000; duty += 25) { ... }', lines: [38] },
+      { f: 'tim2', t: 'tim2', label: 'one value per wrap', kind: 'bad', title: 'Each millisecond sees a different step', desc: 'The timer copies whatever CCR1 holds at each update event. The ramp is faster than the period, so consecutive periods sample different duties.', code: '/* hardware */  CCR1 at wrap' },
+      { f: 'tim2', t: 'led', label: 'no fade', kind: 'bad', title: 'The eye averages it', desc: 'Instead of a slow rise, the light settles near mid-brightness and shimmers. The 50 ms wait is what makes the fade visible.', code: '/* perceived ≈ average duty */', set: { light: '≈ 50 %' }, verdict: 'bad', verdictText: 'A ramp faster than the PWM period is not a fade. The delay is part of the effect, not padding.' }
+    ] }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'tim_pwm_fade/main.c', key: 'pwmFadeSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'main', t: 'main', s: 'for (;;)' },
+      { id: 'tim2', t: 'TIM2', s: 'CNT · CCR1' },
+      { id: 'pin', t: 'PA5', s: '1 kHz output' },
+      { id: 'led', t: 'LED', s: 'perceived' }
+    ]
+  });
+})();
+
+/* ---------- the ramp lab ---------- */
+(function () {
+  var STEPS = 1000, STEP = 25, MS = 50, N = STEPS / STEP;      /* 40 */
+  var MAXT = (N + 1) * MS;                                     /* 2050 ms */
+  var playing = false, t = 0, last = 0;
+  var cell = [], strip = $('strip');
+  for (var i = 0; i <= N; i++) {
+    var b = document.createElement('button');
+    b.className = 'rcell'; b.type = 'button';
+    b.setAttribute('aria-label', 'step ' + i + ', duty ' + (i * STEP));
+    b.onclick = function (k) { return function () { playing = false; $('play').textContent = 'Play'; t = k * MS; render(); }; }(i);
+    strip.appendChild(b); cell.push(b);
+  }
+
+  function dutyAt(ms) {
+    var k = Math.min(N, Math.floor(ms / MS));
+    return { k: k, duty: k * STEP };
+  }
+  function perceived(d) { return Math.pow(d / STEPS, 1 / 2.2); }
+
+  var cv = $('pwm'), ctx = cv.getContext('2d');
+  function fit() {
+    var r = devicePixelRatio || 1;
+    cv.width = cv.clientWidth * r; cv.height = cv.clientHeight * r;
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+  }
+  addEventListener('resize', function () { fit(); render(); });
+
+  function drawPwm(duty) {
+    var W = cv.clientWidth, H = cv.clientHeight, cs = getComputedStyle(document.documentElement);
+    var ink = cs.getPropertyValue('--ink').trim(), line = cs.getPropertyValue('--line').trim(),
+        ember = cs.getPropertyValue('--ember').trim(), muted = cs.getPropertyValue('--ink-3').trim();
+    var L = 46, R = 12, pw = W - L - R, yHi = H * 0.3, yLo = H * 0.72;
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '600 10px JetBrains Mono, monospace'; ctx.textBaseline = 'middle';
+    /* two 1 ms periods */
+    for (var p = 0; p < 2; p++) {
+      var x0 = L + pw / 2 * p, x1 = x0 + pw / 2, xh = x0 + (pw / 2) * (duty / STEPS);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.4; ctx.lineJoin = 'miter';
+      ctx.beginPath();
+      ctx.moveTo(x0, yLo); ctx.lineTo(x0, yHi); ctx.lineTo(xh, yHi); ctx.lineTo(xh, yLo); ctx.lineTo(x1, yLo);
+      ctx.stroke();
+      if (p === 0) {
+        ctx.fillStyle = ember; ctx.fillText('high ' + duty + ' µs', x0 + 6, yHi - 12);
+      }
+    }
+    /* axis */
+    ctx.strokeStyle = line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(L, yLo + 16); ctx.lineTo(L + pw, yLo + 16); ctx.stroke();
+    ctx.fillStyle = muted;
+    for (var q = 0; q <= 2; q++) {
+      var x = L + pw / 2 * q;
+      ctx.beginPath(); ctx.moveTo(x, yLo + 16); ctx.lineTo(x, yLo + 21); ctx.stroke();
+      ctx.textAlign = q === 0 ? 'left' : q === 2 ? 'right' : 'center';
+      ctx.fillText(q + ' ms', x, yLo + 32);
+    }
+    ctx.textAlign = 'left';
+    ctx.fillStyle = muted; ctx.fillText('1 kHz · 2 periods', L, 12);
+  }
+
+  function render() {
+    var d = dutyAt(t), duty = d.duty, p = perceived(duty);
+    $('tv').innerHTML = fmt(Math.round(t)) + '<small>ms</small>';
+    $('step').textContent = 'step ' + d.k + ' / ' + N;
+    $('vduty').textContent = (duty / 10).toFixed(1) + '%';
+    $('vperc').textContent = Math.round(p * 100) + '%';
+    $('bduty').style.width = (duty / STEPS * 100) + '%';
+    $('bperc').style.width = (p * 100) + '%';
+    $('led').style.opacity = (0.10 + 0.90 * p).toFixed(3);
+    $('led').style.borderColor = p > 0.5 ? 'var(--ember)' : 'var(--line)';
+    cell.forEach(function (c, i) {
+      c.style.background = i === 0 ? 'var(--card-2)' : 'color-mix(in srgb, var(--ember) ' + Math.round(i / N * 78) + '%, var(--card-2))';
+      c.setAttribute('aria-current', i === d.k ? 'true' : 'false');
+    });
+    $('fhint').textContent = 'At ' + (duty / 10).toFixed(1) + '% duty the LED is high ' + duty + ' µs of every 1 000 µs, and the eye sees about ' +
+      Math.round(p * 100) + '% of full. Simple model: perceived ≈ (duty/1000)^(1/2.2); real LEDs and eyes differ, so read the shape, not the exact number.';
+    drawPwm(duty);
+  }
+
+  function frame(now) {
+    var dt = Math.min(60, now - last); last = now;
+    if (playing) { t += dt; if (t >= MAXT) t = 0; render(); }
+    requestAnimationFrame(frame);
+  }
+
+  $('t').addEventListener('input', function () { playing = false; $('play').textContent = 'Play'; t = +this.value; render(); });
+  $('play').onclick = function () {
+    playing = !playing; this.textContent = playing ? 'Pause' : 'Play';
+    if (playing && t >= MAXT - 1) t = 0;
+  };
+  $('loop').onclick = function () { playing = false; $('play').textContent = 'Play'; t = MAXT - 60; render(); };
+
+  fit();
+  /* keep the slider and the animation in step */
+  setInterval(function () { if (playing) $('t').value = Math.round(t); }, 100);
+  render(); requestAnimationFrame(frame);
+})();
+
+/* ---------- ramp calculator ---------- */
+(function () {
+  function render() {
+    var step = Math.max(1, Math.min(500, Math.round(+$('fstep').value) || 25));
+    var ms = Math.max(5, Math.min(500, Math.round(+$('fms').value) || 50));
+    var N = Math.floor(1000 / step), top = N * step, writes = N + 1, cyc = writes * ms;
+    $('cyc').innerHTML = fmt(cyc) + ' <small>ms per cycle</small>';
+    $('kv-ramp').innerHTML = [
+      ['Writes per cycle', fmt(writes) + (1000 % step ? ' (last value ' + fmt(top) + ')' : '')],
+      ['Full scale reached', 1000 % step ? 'no, stops at ' + (top / 10).toFixed(1) + ' %' : 'yes, 100 %'],
+      ['Steps per second', fmt(Math.round(1000 / ms))],
+      ['Restarts per minute', (60000 / cyc).toFixed(1)]
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+    $('rampwarn').className = 'warnbox' + (1000 % step ? ' show' : '');
+  }
+  $('fstep').addEventListener('input', render);
+  $('fms').addEventListener('input', render);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-s]'), function (b) {
+    b.onclick = function () { $('fstep').value = b.dataset.s; render(); };
+  });
+  $('kv-fixed').innerHTML = [
+    ['PWM frequency', '1 kHz (1 ms)'],
+    ['Duty resolution', '0.1 % (1 of 1 000)'],
+    ['CCR1 at 50 %', '500'],
+    ['Pin', 'PA5 · TIM2_CH1'],
+    ['Who owns TIM2', 'lib/pwm.c']
+  ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+  render();
+})();
+</script>
+</body>
+</html>

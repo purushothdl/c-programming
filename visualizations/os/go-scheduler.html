@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Go scheduler, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.gcode { margin: 0; padding: 10px 12px; font: 400 11.5px/1.6 "JetBrains Mono", monospace; background: var(--card-2); border: 1px solid var(--line-2); border-radius: 4px; overflow-x: auto; color: var(--ink); white-space: pre; }
+.mcard { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.mbars { display: grid; gap: 10px; }
+.mbar b { font: 500 22px "JetBrains Mono", monospace; letter-spacing: -.02em; }
+.mbar small { font-size: 12px; color: var(--ink-3); margin-left: 6px; }
+.mbar .t { height: 6px; background: var(--line-2); border-radius: 1px; margin-top: 6px; position: relative; }
+.mbar .t i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink-3); border-radius: 1px; }
+.mbar.g .t i { background: var(--ember); }
+@media (max-width: 820px) { .mcard { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">Go scheduler <span>goroutines on threads</span></a>
+    <a class="l" href="#sched">Scheduler</a>
+    <a class="l" href="#cost">Cost</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+<header class="hero">
+  <div>
+    <div class="eyebrow">Go runtime · src/runtime/proc.go</div>
+    <h1 style="margin-top:14px">Thousands of goroutines, a handful of threads. <em>The runtime does the juggling.</em></h1>
+    <p class="serif">A goroutine is a small struct, not a thread. A few OS threads run them, and the runtime moves goroutines between threads in user space. The kernel only gets involved when a thread has to sleep or wake.</p>
+    <div class="cta"><a class="btn dark" href="#sched">Step through it →</a><a class="btn" href="#cost">What a switch costs</a></div>
+  </div>
+  <div class="spec">
+    <div><span>Default P count</span><b>GOMAXPROCS = CPU count</b></div>
+    <div><span>Time slice</span><b>10 ms (forcePreemptNS)</b></div>
+    <div><span>Steal</span><b>half the queue, rounded up</b></div>
+    <div><span>Global queue checked</span><b>every 61 scheduler ticks</b></div>
+    <div><span>New goroutine goes to</span><b>runnext of the current P</b></div>
+    <div><span>Checked against</span><b>go1.26.5 source</b></div>
+  </div>
+</header>
+
+<div class="three">
+  <div class="card"><b>G · goroutine</b>Your function plus its own small stack. Cheap to make, and thousands can exist at once.</div>
+  <div class="card"><b>M · machine</b>A real OS thread. The kernel schedules it. It can sleep inside a system call.</div>
+  <div class="card"><b>P · processor</b>A permit to run Go code, with a queue of runnable Gs. An M needs a P to run a G. There are GOMAXPROCS of them.</div>
+</div>
+
+<section id="sched">
+  <div class="sh"><div class="eyebrow">01 · what the scheduler does</div><h2>Five situations, step by step</h2>
+    <p>Pick a tab. The Watch table shows the run queues and who owns what. The last tab is a bug: a goroutine that never gives the CPU back.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="cost">
+  <div class="sh"><div class="eyebrow">02 · why bother</div><h2>What a switch costs</h2>
+    <p>Same job, two ways: hand the CPU to another goroutine, or to another thread. This sequence has no Watch table and no code sheet, only the steps.</p></div>
+  <div id="seq2"></div>
+  <div class="mcard" style="margin-top:16px">
+    <div class="card">
+      <h3>Measured here <span>Apple M5 · go1.26.5 · one run each</span></h3>
+      <div class="mbars">
+        <div class="mbar g"><b>121 ns</b><small>goroutine switch, 1 P</small><div class="t"><i style="width:1.6%"></i></div></div>
+        <div class="mbar"><b>7,787 ns</b><small>thread switch (goroutines locked to threads)</small><div class="t"><i style="width:100%"></i></div></div>
+      </div>
+      <p class="hint" style="margin-top:10px">About 64 times apart. The thread number includes waking a sleeping thread, not only the context switch. Your machine will give other numbers, but the gap is the point.</p>
+    </div>
+    <div class="card">
+      <h3>The test <span>ping-pong over two unbuffered channels</span></h3>
+<pre class="gcode">a, b := make(chan int), make(chan int)
+go func() { for i := 0; i &lt; n; i++ { &lt;-a; b &lt;- i } }()
+for i := 0; i &lt; n; i++ { a &lt;- i; &lt;-b }
+// 1 P: both goroutines share a thread.
+// Locked: runtime.LockOSThread() in both, 4 Ps.
+// ns per switch = elapsed / n / 2</pre>
+    </div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>go f() does not run f now</b>The new goroutine waits in the current P's runnext slot. Another thread only takes it after a short pause (runqgrab, about 3 µs).</div>
+    <div><b>A blocking call does not block other goroutines</b>The thread sleeps, but sysmon takes its P away and gives it to another thread. In my test 1.19 million loops ran in 50 ms with one P.</div>
+    <div><b>A tight loop can hold a P for 10 ms or more</b>Preemption is by time slice, checked by sysmon. In my run the other goroutine waited 13 ms, not 1.</div>
+    <div><b>Ping-pong pairs cannot starve the rest forever</b>runnext shares one time slice, so sysmon preempts the pair after 10 ms (comment in runqput). The global queue is also checked every 61 ticks.</div>
+    <div><b>Steals take the front of the queue</b>The thief takes half, rounded up (n - n/2), so 4 queued goroutines become 2 and 2.</div>
+    <div><b>LockOSThread brings thread costs back</b>A goroutine pinned to a thread switches at thread cost, as the measured card shows.</div>
+  </div>
+</section>
+
+<footer>Source: go1.26.5 src/runtime/proc.go: newproc 5295 · goready 481, ready 1120 · findRunnable 3389 (61-tick check 3443) · stealWork 3828 · runqgrab 7662 · runqsteal 7732 · retake 6630, forcePreemptNS 6628 · entersyscall 4737, exitsyscall 4883 · goschedImpl 4307 · preemptone 6886. Line numbers are for that version. Switch costs and the 1 ms vs 13 ms test are single runs on one machine. The thread-handoff order in the syscall tab follows the source but was not traced step by step.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var L4 = [{ id: 'g', t: 'Goroutines', s: 'G' }, { id: 'p', t: 'P', s: 'run queue' }, { id: 'm', t: 'M0', s: 'OS thread' }, { id: 'k', t: 'Kernel', s: 'and sysmon' }];
+
+Seq.mount(document.getElementById('seq'), {
+  key: 'goSchedSide', code: false, lanes: L4,
+  scenarios: [
+    { id: 'spawn', tab: 'go f()', init: { G1: 'running', G2: 'not made yet', 'P0.runnext': '-', 'P0.runq': '-', M1: 'idle' }, steps: [
+      { f: 'g', t: 'p', label: 'go f()', title: 'go f() makes G2 and parks it in runnext', desc: 'No thread is created. G2 is a small struct. It goes in the "run next" slot of the current P.', set: { G2: 'runnable', 'P0.runnext': 'G2' } },
+      { f: 'p', t: 'k', label: 'wakep()', kind: 'irq', title: 'An idle P exists, so a thread is woken', desc: 'Another P has nothing to do, so the runtime wakes a thread (M1) to look for work. This one is a real kernel wake-up.', set: { M1: 'spinning' } },
+      { f: 'k', t: 'p', label: 'M1 looks at P0', kind: 'ret', title: 'M1 finds nothing it may take yet', desc: 'P0.runq is empty. runnext is taken only on the last try, after a short pause, so P0 gets a chance to run it first.', set: { M1: 'idle again' }, note: 'if G1 ran long, M1 would take G2 after the pause', noteAt: 'p' },
+      { f: 'g', t: 'p', label: 'G1 blocks', title: 'G1 blocks (say, on wg.Wait())', desc: 'G1 is parked. Its thread is free to do other work.', set: { G1: 'waiting' } },
+      { f: 'p', t: 'm', label: 'schedule()', title: 'P0 picks its runnext', desc: 'The same thread, M0, asks P0 for the next goroutine and gets G2.', set: { 'P0.runnext': '-', G2: 'running' } },
+      { f: 'm', t: 'g', label: 'run G2', kind: 'good', title: 'G2 runs on the same thread', desc: 'One thread, no new thread created.', verdict: 'good', verdictText: 'go f() cost a struct and a queue slot, not a thread.' }
+    ] },
+
+    { id: 'chan', tab: 'chan block', init: { G1: 'running', G2: 'runnable', 'P0.runnext': '-', 'P0.runq': 'G2', channel: 'empty' }, steps: [
+      { f: 'g', t: 'p', label: '<-ch', title: 'G1 receives from an empty channel', desc: 'Nothing to take, so G1 is parked on the channel. Its thread is not blocked. (One P here, to keep it simple.)', set: { G1: 'waiting on ch' } },
+      { f: 'p', t: 'm', label: 'schedule()', title: 'The thread picks another goroutine', desc: 'M0 stays busy. It takes G2 from the run queue.', set: { 'P0.runq': '-', G2: 'running' } },
+      { f: 'm', t: 'g', label: 'run G2', title: 'G2 runs', desc: 'The switch happened in user space.' },
+      { f: 'g', t: 'p', label: 'ch <- 1', title: 'G2 sends and wakes G1', desc: 'The value goes straight to G1. G1 becomes runnable and is put in runnext (goready calls ready with next = true).', set: { G1: 'runnable', 'P0.runnext': 'G1' } },
+      { f: 'g', t: 'p', label: 'G2 ends', title: 'G2 finishes, P0 picks runnext', desc: 'That is G1, the goroutine that was just woken.', set: { G2: 'done', 'P0.runnext': '-', G1: 'running' } },
+      { f: 'm', t: 'g', label: 'run G1', kind: 'good', title: 'G1 resumes with the value', desc: 'Two goroutine switches. The thread never slept and no system call was made.', verdict: 'good', verdictText: 'About 121 ns per switch on this machine (measured below).' }
+    ] },
+
+    { id: 'syscall', tab: 'blocking call', lanes: [{ id: 'g', t: 'Goroutines', s: 'G1, G2' }, { id: 'm', t: 'M0', s: 'thread' }, { id: 'k', t: 'Kernel', s: 'and sysmon' }, { id: 'p', t: 'P0', s: 'the only P' }, { id: 'n', t: 'M1', s: 'another thread' }],
+      init: { G1: 'running', G2: 'runnable', P0: 'owned by M0', 'P0.runq': 'G2', 'global runq': '-', M0: 'running G1', M1: 'none' }, steps: [
+      { f: 'g', t: 'm', label: 'read(fd)', title: 'G1 makes a blocking system call', desc: 'The thread enters the kernel carrying G1. P0 is marked "in syscall" but is still attached to M0.', set: { G1: 'in syscall', M0: 'in kernel' } },
+      { f: 'm', t: 'k', label: 'sleeps', title: 'The kernel puts M0 to sleep', desc: 'It waits for data. This thread can run nothing else.', set: { M0: 'asleep in kernel' } },
+      { f: 'k', t: 'p', label: 'retake P0', kind: 'irq', title: 'sysmon takes P0 away', desc: 'sysmon is a helper thread that runs without a P. P0 has sat in the syscall for more than one of its ticks (at least 20 µs) and has work waiting, so it takes P0. It would leave P0 alone only if the queue were empty, another P were idle, and under 10 ms had passed.', set: { P0: 'taken by sysmon' } },
+      { f: 'p', t: 'n', label: 'handoffp', title: 'P0 goes to another thread', desc: 'handoffp starts (or wakes) M1 and gives it P0.', set: { P0: 'owned by M1', M1: 'running P0' } },
+      { f: 'n', t: 'g', label: 'run G2', title: 'G2 runs while G1 waits', desc: 'With one P, G2 still makes progress. A blocked thread did not stop the program.', set: { G2: 'running on M1', 'P0.runq': '-' } },
+      { f: 'k', t: 'm', label: 'read returns', kind: 'irq', title: 'Data arrives, M0 wakes up', desc: 'M0 is back in Go code (exitsyscall) and wants a P for G1.', set: { M0: 'woke up', G1: 'wants a P' } },
+      { f: 'm', t: 'p', label: 'no free P', title: 'G1 cannot get a P', desc: 'P0 belongs to M1 now. G1 goes on the global run queue and M0 goes to sleep.', set: { G1: 'runnable (global)', 'global runq': 'G1', M0: 'idle' } },
+      { f: 'n', t: 'g', label: 'run G1', kind: 'good', title: 'Later, G1 gets a P again', desc: 'When G2 ends or blocks, M1 finds its own queue empty and takes G1 from the global queue.', set: { G1: 'running on M1', 'global runq': '-' }, verdict: 'good', verdictText: 'With one P, G2 ran 1.19 million loops in 50 ms while G1 sat in read (my test).' }
+    ] },
+
+    { id: 'steal', tab: 'work stealing', lanes: [{ id: 'g', t: 'Goroutines', s: 'G1 to G5' }, { id: 'p0', t: 'P0', s: 'busy' }, { id: 'p1', t: 'P1', s: 'idle' }, { id: 'm1', t: 'M1', s: 'thread of P1' }],
+      init: { 'P0 running': 'G1', 'P0.runq': 'G2 G3 G4 G5', 'P1 running': '-', 'P1.runq': '-' }, steps: [
+      { f: 'm1', t: 'p1', label: 'no work', title: 'P1 has nothing to run', desc: 'M1 looks in its own queue, then the global queue. Both are empty.' },
+      { f: 'p1', t: 'p0', label: 'steal', kind: 'irq', title: 'P1 steals half of P0\'s queue', desc: 'It takes half, rounded up: 2 of 4, from the front. One runs now. The other waits in P1\'s own queue.', set: { 'P0.runq': 'G4 G5', 'P1.runq': 'G2', 'P1 running': 'G3' }, note: 'n - n/2 in runqgrab', noteAt: 'p0' },
+      { f: 'p1', t: 'g', label: 'run G3', kind: 'good', title: 'Two threads are busy now', desc: 'Nobody asked for this. An idle P found work on its own.', verdict: 'good', verdictText: 'Work spread over two threads with no code written for it.' }
+    ] },
+
+    { id: 'spin', tab: 'spin loop', bug: true, init: { main: 'running', spinner: 'not made yet', P0: 'main', 'global runq': '-' }, steps: [
+      { f: 'g', t: 'p', label: 'go spin(); Gosched()', title: 'main starts a spinner and yields', desc: 'Gosched puts main on the global queue (goschedImpl). P0 takes the spinner. (One P.)', set: { main: 'runnable (global)', spinner: 'running', P0: 'spinner', 'global runq': 'main' } },
+      { f: 'p', t: 'm', label: 'run spinner', title: 'The thread runs the spinner', desc: 'for { } has no function calls, no channel operations and no yield.' },
+      { f: 'm', t: 'm', label: 'for { }', kind: 'bad', title: 'It cannot step aside on its own', desc: 'Nothing in the loop ever enters the scheduler.' },
+      { f: 'k', t: 'p', label: '10 ms slice', kind: 'irq', title: 'sysmon sees the same G for 10 ms', desc: 'forcePreemptNS is 10 ms. sysmon checks at its own pace, so the real wait can be longer.' },
+      { f: 'k', t: 'm', label: 'signal', kind: 'irq', title: 'A signal interrupts the thread', desc: 'preemptone asks the thread to stop the goroutine at a safe point (async preemption, using SIGURG on unix).' },
+      { f: 'm', t: 'p', label: 'preempted', title: 'The spinner goes to the global queue', desc: 'The scheduler runs again on this thread.', set: { spinner: 'runnable (global)', 'global runq': 'main spinner' } },
+      { f: 'p', t: 'g', label: 'run main', kind: 'bad', title: 'main finally runs', desc: 'It waited a whole time slice for a yield that would have taken nanoseconds.', set: { main: 'running', P0: 'main', 'global runq': 'spinner' }, verdict: 'bad', verdictText: 'main got the P back after 13 ms in my run (one run, not a guarantee).' }
+    ] }
+  ]
+});
+
+Seq.mount(document.getElementById('seq2'), {
+  key: 'goCostSide', code: false, watch: false,
+  lanes: [{ id: 'a', t: 'G1', s: 'goroutine' }, { id: 's', t: 'Runtime', s: 'user space' }, { id: 'b', t: 'G2', s: 'goroutine' }],
+  scenarios: [
+    { id: 'gswitch', tab: 'goroutine switch', steps: [
+      { f: 'a', t: 's', label: 'blocks on channel', title: 'G1 calls into the scheduler', desc: 'An ordinary function call. The runtime saves where G1 was (stack pointer, program counter) in its g struct.' },
+      { f: 's', t: 's', label: 'pick next', title: 'The runtime picks G2', desc: 'It reads the P\'s run queue. This is plain memory access.' },
+      { f: 's', t: 'b', label: 'jump to G2', kind: 'good', title: 'It loads G2\'s saved state and jumps', desc: 'No system call and no kernel. The thread never stopped.', verdict: 'good', verdictText: 'About 121 ns on this machine.' }
+    ] },
+    { id: 'tswitch', tab: 'thread switch', bug: true,
+      lanes: [{ id: 'a', t: 'Thread A', s: 'user mode' }, { id: 's', t: 'Kernel', s: 'scheduler' }, { id: 'b', t: 'Thread B', s: 'user mode' }],
+      steps: [
+      { f: 'a', t: 's', label: 'system call', kind: 'irq', title: 'Thread A traps into the kernel', desc: 'Waiting on a futex or similar. The CPU changes mode.' },
+      { f: 's', t: 's', label: 'pick next', title: 'The kernel saves A and picks B', desc: 'It stores A\'s registers, chooses a runnable thread and loads B\'s registers.' },
+      { f: 's', t: 'b', label: 'return to user', kind: 'bad', title: 'The CPU returns to user mode in B', desc: 'Two mode changes and a kernel scheduling decision, plus waking B if it was asleep.', verdict: 'bad', verdictText: 'About 7,787 ns in my locked ping-pong test, which includes the wake-up.' }
+    ] }
+  ]
+});
+</script>
+</body>
+</html>

@@ -38,6 +38,7 @@
 <section class="group">
   <h2>UART <span>uart/</span></h2>
   <div class="list">
+    <a class="item" href="uart/poll-vs-irq.html"><b>Why we need the ring</b><p>One millisecond of sleep lets eleven bytes pile up behind one register. Step through the loss, then drag the look interval until the same code stops losing data.</p><span class="src">programs/uart_echo_poll.c · RM0390 §25.4.3</span><span class="st new">new style</span></a>
     <a class="item" href="uart/ring-buffer.html"><b>Ring buffer</b><p>Type letters and watch the interrupt fill the ring. Switch between a realistic and a busy main. Drag a slider to see why head &amp; 7 finds the slot.</p><span class="src">programs/uart_echo_irq.c</span><span class="st new">new style</span></a>
     <a class="item" href="uart/cli-tx.html"><b>TX interrupt</b><p>Send "hi" and watch TXEIE arm and disarm. Four tabs, two of them bugs. A calculator shows when main has to wait.</p><span class="src">lib/uart.c</span><span class="st new">new style</span></a>
     <a class="item" href="uart/cli-numbers.html"><b>Print and parse</b><p>Type your own input and step through print_dec32, print_hex32, parse_u32 and tokenize line by line.</p><span class="src">lib/fmt.c</span><span class="st new">new style</span></a>
@@ -47,10 +48,25 @@
 </section>
 
 <section class="group">
+  <h2>Core <span>core/</span></h2>
+  <div class="list">
+    <a class="item" href="core/systick-irq.html"><b>SysTick interrupt</b><p>One millisecond tick, a 24-bit reload value, and a handler that wakes main from WFI. Two ways to break it: no TICKINT, or a compare that fails when the counter wraps.</p><span class="src">programs/systick_irq.c · PM0214 §4.5</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
+  <h2>GPIO <span>gpio/</span></h2>
+  <div class="list">
+    <a class="item" href="gpio/button-irq.html"><b>Button interrupt</b><p>PC13 → SYSCFG → EXTI line 13 → IRQ 40. Bounce, the 20 ms guard, and the pending bit you must clear. Build EXTICR4 and the EXTI line, and replay the guard on three edge sets.</p><span class="src">programs/button_irq.c · RM0390 §8.2.6, §10.3.6</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
   <h2>Timers <span>tim/</span></h2>
   <div class="list">
     <a class="item" href="tim/capture.html"><b>TIM5 input capture</b><p>Five event sequences (two of them bugs), a debounce tuning lab, and a register builder for CCMR1 and CCER.</p><span class="src">programs/tim_capture/main.c</span><span class="st new">new style</span></a>
     <a class="item" href="tim/channels.html"><b>Timer channel path</b><p>Follow one channel from counter to pin through its four gates. Cut one, flip one, and see all four pins on one analyser. Build CCMR1 and CCER and work out period and duty.</p><span class="src">programs/tim_pwm · lib/pwm.c</span><span class="st new">new style</span></a>
+    <a class="item" href="tim/pwm-fade.html"><b>LED fade</b><p>+25 duty every 50 ms: 41 steps, 2.05 s up, then a jump to zero. Linear duty is not linear light, and the 50 ms wait is what makes the fade visible at all.</p><span class="src">programs/tim_pwm_fade · lib/pwm.c</span><span class="st new">new style</span></a>
   </div>
 </section>
 
@@ -62,8 +78,10 @@
 </section>
 
 <section class="group">
-  <h2>Not built yet</h2>
-  <div class="list"><div class="todo"><code>button_irq</code><code>systick_irq</code><code>tim_pwm_fade</code><code>uart_echo_poll</code> have no page. <code>uart_echo_poll</code> would pair with the ring buffer page as "why we need the ring".</div></div>
+  <h2>OS and runtimes <span>os/</span></h2>
+  <div class="list">
+    <a class="item" href="os/go-scheduler.html"><b>Go scheduler</b><p>Goroutines on OS threads: spawn, channel block, blocking system call, work stealing and a spin loop. Then what a switch costs, measured.</p><span class="src">Go runtime proc.go · go1.26.5</span><span class="st new">new style</span></a>
+  </div>
 </section>
 
 <footer>Shared files: shared/style.css · theme.js · split.js · seq.js. See .claude/skills/visualize-concept/ to add a page.</footer>

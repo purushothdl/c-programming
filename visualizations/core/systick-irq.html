@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SysTick interrupt, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">systick_irq.c <span>a tick you do not poll</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#numbers">Reload value</a>
+    <a class="l" href="#registers">Registers</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/systick_irq.c</div>
+    <h1 style="margin-top:14px">The tick arrives by itself. <em>main just sleeps.</em></h1>
+    <p class="serif">SysTick counts down from 15 999 and wraps every millisecond. The wrap raises exception 15, the handler adds one, and main wakes from <code>__WFI()</code> only when 500 ms have passed. Nothing spins, and nothing polls.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sequence">Step through one tick →</a>
+      <a class="btn" href="#numbers">Change the reload value</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Core clock</span><b>HSI 16 MHz · no PLL</b></div>
+    <div><span>LOAD</span><b>15 999 = 0x003E7F</b></div>
+    <div><span>Tick</span><b>16 000 cycles = 1 ms</b></div>
+    <div><span>Exception</span><b>15 · vector 0x3C</b></div>
+    <div><span>Handler</span><b>SysTick_Handler</b></div>
+    <div><span>Shared counter</span><b>g_ms_ticks · uint32</b></div>
+    <div><span>Toggle period</span><b>500 ticks</b></div>
+    <div><span>LOAD width</span><b>24 bits · max 1.049 s</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>16 MHz core clock</b><span>CLKSOURCE = 1, AHB</span></div>
+  <div class="s hw"><i>HW 2</i><b>STK_VAL</b><span>counts 15 999 → 0</span></div>
+  <div class="s hw"><i>HW 3</i><b>Wrap</b><span>COUNTFLAG = 1, pends exception 15</span></div>
+  <div class="s"><i>CODE 4</i><b>SysTick_Handler</b><span>g_ms_ticks++</span></div>
+  <div class="s"><i>CODE 5</i><b>main</b><span>compare, toggle every 500, WFI</span></div>
+  <div class="s hw"><i>HW 6</i><b>PA5 LED</b><span>one BSRR write per toggle</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div>
+    <h2>One tick, one wake</h2>
+    <p>The first tab is the real loop. The second starts SysTick without <code>TICKINT</code>, so the counter runs but nobody is called. The third is a bug tab: a plain <code>&gt;=</code> compare that breaks the first time the 32-bit counter wraps.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="numbers">
+  <div class="sh"><div class="eyebrow">02 · the reload value</div>
+    <h2>How many cycles is a tick?</h2>
+    <p>SysTick counts down by one each processor clock. For a period of N cycles, <code>LOAD = N − 1</code> (PM0214 p. 248). The register is 24 bits wide, so one tick cannot be longer than 1.049 s.</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>Reload calculator <span>f<sub>CK</sub> = 16 MHz</span></h3>
+      <div class="inl">Tick <input type="number" id="tickms" value="1" min="0.05" max="5000" step="0.1"> ms
+        <button class="btn sm ghost" data-ms="0.1">0.1</button>
+        <button class="btn sm ghost" data-ms="1">1</button>
+        <button class="btn sm ghost" data-ms="10">10</button></div>
+      <div class="big" id="loadout"></div>
+      <div class="kv" id="kv-load"></div>
+      <div class="warnbox" id="loadwarn">A tick this long needs more than 24 bits. Use a software counter: keep the tick at 1 ms and count in the handler.</div>
+    </div>
+    <div id="registers" class="card">
+      <h3>SysTick-&gt;CTRL <span>0xE000E010 · reset 0</span></h3>
+      <div class="bits" style="max-width:300px"><div class="row" id="b-ctrl"></div></div>
+      <div class="out" id="o-ctrl"></div>
+      <div class="kv" id="kv-ctrl"></div>
+      <div class="warnbox" id="w-ctrl"></div>
+      <div style="margin-top:10px"><button class="btn sm" id="loadctrl">Load the program's value</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>24 bits is the whole range</b>LOAD tops out at 0x00FFFFFF: 16 777 216 cycles, 1.049 s at 16 MHz. Longer periods need your own counter.</div>
+    <div><b>TICKINT is what wakes main</b>Without it the counter still wraps and sets COUNTFLAG, but no exception is pended. WFI then sleeps forever (tab 2).</div>
+    <div><b>Plain <code>&gt;=</code> is not wrap-safe</b>Compare <code>(int32_t)(now − next) &gt;= 0</code>. When the counter wraps, a bare compare waits 49.7 days (tab 3).</div>
+    <div><b><code>g_ms_ticks</code> must be volatile</b>The handler writes it, main reads it. Without volatile an optimised build may keep the old value in a register.</div>
+    <div><b>The vector name is exact</b>startup.s points 0x3C at <code>SysTick_Handler</code>, with a weak default that loops forever. A misspelt handler links and then hangs on the first tick.</div>
+    <div><b>A breakpoint stops time</b>While the core is halted for debugging, the SysTick counter does not decrement (PM0214 p. 246).</div>
+  </div>
+</section>
+
+<footer>Source: programs/systick_irq.c (lines 18–68) · PM0214 §4.5 p. 246–249 (STK_CTRL, STK_LOAD, STK_VAL), Table 17 p. 39 (exception 15) · startup.s vector 0x3C · SVD: svd/stm32f446re.svd (GPIOA.BSRR)</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence: programs/systick_irq.c ---------- */
+(function () {
+  var SRC = [
+    [18, 'static volatile uint32_t g_ms_ticks;'],
+    [0, ''],
+    [22, 'void SysTick_Handler(void)'], [23, '{'], [24, '    g_ms_ticks++;'], [25, '}'],
+    [0, ''],
+    [38, 'static void systick_init(void)'], [39, '{'],
+    [40, '    SysTick->LOAD = (CPU_CLK_HZ / SYSTICK_HZ) - 1u;   /* 16000 - 1 */'],
+    [41, '    SysTick->VAL  = 0u;                               /* clear current count */'],
+    [42, '    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |      /* count the CPU clock */'],
+    [43, '                    SysTick_CTRL_TICKINT_Msk   |      /* interrupt on wrap (NEW) */'],
+    [44, '                    SysTick_CTRL_ENABLE_Msk;          /* start */'],
+    [45, '}'],
+    [0, ''],
+    [47, 'int main(void)'], [48, '{'], [49, '    led_init();'], [50, '    systick_init();'],
+    [52, '    uint32_t next_toggle = 0u;'],
+    [0, ''],
+    [54, '    for (;;) {'],
+    [56, '        if ((int32_t)(g_ms_ticks - next_toggle) >= 0) {'],
+    [57, '            next_toggle += 500u;'],
+    [59, '            if ((GPIOA->ODR & (1u << LED_PIN)) != 0u) {'],
+    [60, '                GPIOA->BSRR = GPIO_BSRR_BR5;         /* LED off */'],
+    [61, '            } else {'],
+    [62, '                GPIOA->BSRR = GPIO_BSRR_BS5;         /* LED on  */'],
+    [63, '            }'],
+    [64, '        }'],
+    [66, '        __WFI();   /* sleep until the next interrupt (SysTick) */'],
+    [67, '    }'], [68, '}']
+  ];
+
+  var B = { ms: '12 999', next: '13 000', led: 'on', main: 'WFI' };
+  function base(o) { var r = {}, k; for (k in B) r[k] = B[k]; for (k in o) r[k] = o[k]; return r; }
+
+  var SCEN = [
+    { id: 'tick', tab: 'one_tick.seq', init: base({}), steps: [
+      { f: 'tick', t: 'tick', label: '15999 → 0', title: 'The counter reaches zero', desc: 'SysTick counts down at the core clock. LOAD was 15 999, so one full period is 16 000 cycles: 1 ms at 16 MHz.', code: '/* hardware */  STK_VAL: 1 → 0', lines: [40] },
+      { f: 'tick', t: 'tick', label: 'wrap', title: 'Wrap: flag and request', desc: 'COUNTFLAG is set and the reload value is loaded again. Because TICKINT = 1, the SysTick exception is pended (PM0214 p. 247).', code: '/* hardware */  COUNTFLAG = 1, exception 15 pended' },
+      { f: 'tick', t: 'isr', label: 'exception 15', kind: 'irq', title: 'The core takes the exception', desc: 'Vector 0x3C, exception number 15. main is asleep in __WFI(), so nothing else is running.', code: 'void SysTick_Handler(void)', lines: [22] },
+      { f: 'isr', t: 'isr', label: 'g_ms_ticks++', title: 'Count the tick', desc: 'One increment per millisecond. It is volatile because main reads it from another context.', code: 'g_ms_ticks++;', lines: [24], set: { ms: '13 000' } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Exception return', desc: 'main resumes inside the __WFI() call it was executing.', code: '}', lines: [25] },
+      { f: 'main', t: 'main', label: 'compare', title: 'Is it due?', desc: '(int32_t)(13 000 − 13 000) = 0, and 0 ≥ 0, so yes. The subtraction is what keeps this correct across a wrap.', code: 'if ((int32_t)(g_ms_ticks - next_toggle) >= 0) {', lines: [56] },
+      { f: 'main', t: 'main', label: 'next += 500', title: 'Book the next toggle', desc: 'The target moves 500 ticks ahead, so the next event is at 13 500 ms.', code: 'next_toggle += 500u;', lines: [57], set: { next: '13 500' } },
+      { f: 'main', t: 'led', label: 'PA5 off', kind: 'good', title: 'Toggle the LED', desc: 'ODR bit 5 was 1, so the else branch runs and BSRR BR5 clears it. One write, no read-modify-write.', code: 'GPIOA->BSRR = GPIO_BSRR_BR5;', lines: [59, 60, 62], set: { led: 'off' } },
+      { f: 'main', t: 'main', label: '__WFI()', title: 'Back to sleep', desc: 'main goes back to WFI. The next thing that runs is the handler, one millisecond from now.', code: '__WFI();', lines: [66], verdict: 'good', verdictText: 'One tick counted, one toggle booked, CPU asleep again.' }
+    ] },
+    { id: 'notickint', tab: 'no_tickint.seq', bug: true, dim: [43],
+      sheetNote: 'This tab starts SysTick without line 43 (TICKINT). The counter and COUNTFLAG still work; only the exception is missing.',
+      init: base({}), steps: [
+      { f: 'tick', t: 'tick', label: '15999 → 0', title: 'The counter reaches zero', desc: 'Same down-counter, same reload value as the real program.', code: '/* hardware */  STK_VAL: 1 → 0', lines: [40] },
+      { f: 'tick', t: 'tick', label: 'wrap, no request', kind: 'bad', title: 'COUNTFLAG without an exception', desc: 'With TICKINT = 0, counting to zero does not assert the SysTick exception request (PM0214 p. 247). The flag is set and nothing else happens.', code: '/* hardware */  COUNTFLAG = 1, no exception' },
+      { f: 'tick', t: 'tick', label: '1 ms later', kind: 'bad', title: 'And again', desc: 'The counter reloads and wraps forever. COUNTFLAG was already 1, so nothing new is reported either.', code: '/* hardware */' },
+      { f: 'main', t: 'main', label: 'still asleep', kind: 'bad', title: 'WFI never returns', desc: 'No exception is pended, so the core stays asleep. g_ms_ticks never changes and the compare never runs again.', code: '__WFI();', lines: [66], verdict: 'bad', verdictText: 'The timer runs perfectly; the program does nothing. TICKINT is the only link from the counter to your code.' }
+    ] },
+    { id: 'wrap', tab: 'wrap_compare.seq', bug: true, dim: [56],
+      sheetNote: 'This tab replaces line 56 with a plain compare: if (g_ms_ticks >= next_toggle). The real code subtracts before comparing.',
+      init: base({ ms: '4 294 967 096', next: '4 294 967 096', led: 'off', main: 'running' }), steps: [
+      { f: 'main', t: 'main', label: 'compare', title: 'Two values close together', desc: 'g_ms_ticks equals next_toggle, so the event is due. A plain compare agrees here; the difference only shows at the wrap.', code: 'if (g_ms_ticks >= next_toggle) {', lines: [56] },
+      { f: 'main', t: 'main', label: 'next += 500', title: 'Aim past 2³²', desc: 'next_toggle becomes 4 294 967 596, which is beyond the largest 32-bit value. That is allowed: it is just a number.', code: 'next_toggle += 500u;', lines: [57], set: { next: '4 294 967 596' } },
+      { f: 'main', t: 'led', label: 'PA5 on', title: 'LED on', desc: 'The toggle is fine. Now wait for the counter to wrap, 200 ms later.', code: 'GPIOA->BSRR = GPIO_BSRR_BS5;', lines: [59, 62], set: { led: 'on' } },
+      { f: 'main', t: 'main', label: '__WFI()', title: 'Sleep', desc: 'Two hundred ticks from now, g_ms_ticks runs out of bits.', code: '__WFI();', lines: [66] },
+      { f: 'tick', t: 'tick', label: '2³² → 0', title: 'The counter wraps', desc: 'g_ms_ticks goes from 4 294 967 295 to 0. The tick itself is normal; the comparison is not.', code: '/* hardware */  4 294 967 295 → 0' },
+      { f: 'isr', t: 'isr', label: 'g_ms_ticks++', title: 'Count it', desc: 'Now g_ms_ticks = 0.', code: 'g_ms_ticks++;', lines: [24], set: { ms: '0' } },
+      { f: 'main', t: 'main', label: '0 >= 4 294 967 596', kind: 'bad', title: 'False, and it stays false', desc: 'A plain compare has no idea the target is "300 ms after the wrap". It waits for the variable to physically reach 4 294 967 596.', code: 'if (g_ms_ticks >= next_toggle) {   /* false */', lines: [56] },
+      { f: 'main', t: 'main', label: '300 ms later', kind: 'bad', title: 'The correct code toggles here', desc: '(int32_t)(300 − 4 294 967 596) = 0, so the signed version runs the body at g = 300. This tab still says false.', code: '/* plain compare: still false */', lines: [56] },
+      { f: 'main', t: 'led', label: '… 49.7 days', kind: 'bad', title: 'The LED freezes', desc: 'It stays in its current state until the counter climbs back to 4 294 967 596, which takes 49.7 days. No fault, no message.', code: '/* next toggle: day 49 */', verdict: 'bad', verdictText: 'The LED stops blinking for 49.7 days. Wrap-safe compare: subtract, cast to int32_t, then compare with 0.' }
+    ] }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'programs/systick_irq.c', key: 'systickSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'tick', t: 'SysTick', s: 'STK_VAL · LOAD' },
+      { id: 'isr', t: 'Handler', s: 'SysTick_Handler' },
+      { id: 'main', t: 'main', s: 'for (;;) + WFI' },
+      { id: 'led', t: 'PA5', s: 'LED' }
+    ]
+  });
+})();
+
+/* ---------- reload calculator ---------- */
+(function () {
+  var hex = function (v, w) { return '0x' + v.toString(16).toUpperCase().padStart(w, '0'); };
+  function render() {
+    var ms = Math.max(0.05, Math.min(5000, parseFloat($('tickms').value) || 1));
+    var cycles = Math.round(ms / 1000 * 16e6);
+    var load = cycles - 1;
+    var fits = load >= 1 && load <= 0xFFFFFF;
+    var actual = (load + 1) / 16e6 * 1000;
+    $('loadout').innerHTML = fmt(load) + ' <small>STK_LOAD</small>';
+    $('kv-load').innerHTML = [
+      ['LOAD in hex', hex(load, 6)],
+      ['Fits 24 bits', fits ? 'yes' : 'no — max 16 777 215'],
+      ['Cycles per tick', fmt(cycles)],
+      ['Actual period', actual.toFixed(4) + ' ms'],
+      ['Error', (actual - ms >= 0 ? '+' : '') + (actual - ms).toFixed(4) + ' ms'],
+      ['Longest tick (0xFFFFFF)', '1 048.576 ms'],
+      ['g_ms_ticks wraps after', '49.71 days']
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+    $('loadwarn').className = 'warnbox' + (fits ? '' : ' show');
+  }
+  $('tickms').addEventListener('input', render);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ms]'), function (b) {
+    b.onclick = function () { $('tickms').value = b.dataset.ms; render(); };
+  });
+  render();
+})();
+
+/* ---------- CTRL bit builder (bits: PM0214 p. 247) ---------- */
+(function () {
+  var ctrl = 0x00000007;
+  function kv(id, rows) {
+    $(id).innerHTML = rows.map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+  }
+  function render() {
+    var wrap = $('b-ctrl'); wrap.textContent = '';
+    [2, 1, 0].forEach(function (bit) {
+      var on = (ctrl >> bit) & 1;
+      var d = document.createElement('div');
+      d.className = 'bit' + (on ? ' on' : '');
+      d.innerHTML = on + '<small>' + ['ENABLE · 0', 'TICKINT · 1', 'CLKSOURCE · 2'][bit] + '</small>';
+      d.tabIndex = 0; d.setAttribute('role', 'switch'); d.setAttribute('aria-checked', on ? 'true' : 'false');
+      d.onclick = function () { ctrl ^= (1 << bit); render(); };
+      d.onkeydown = function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); ctrl ^= (1 << bit); render(); } };
+      wrap.appendChild(d);
+    });
+    $('o-ctrl').innerHTML = 'SysTick-&gt;CTRL = <span>' + '0x' + (ctrl >>> 0).toString(16).toUpperCase().padStart(8, '0') + '</span>';
+    var clk = (ctrl >> 2) & 1, tick = (ctrl >> 1) & 1, en = ctrl & 1, flag = (ctrl >> 16) & 1;
+    kv('kv-ctrl', [
+      ['CLKSOURCE', clk ? 'processor clock (AHB)' : 'AHB / 8'],
+      ['TICKINT', tick ? 'exception on wrap' : 'no exception'],
+      ['ENABLE', en ? 'counting' : 'stopped'],
+      ['COUNTFLAG', flag ? 'counted to 0 since CTRL was read' : '0 (reading CTRL clears it)']
+    ]);
+    var w = $('w-ctrl');
+    if (!en) { w.className = 'warnbox show'; w.textContent = 'ENABLE = 0: the counter is stopped. No wrap, no tick, and main sleeps in WFI forever.'; }
+    else if (!tick) { w.className = 'warnbox show'; w.textContent = 'TICKINT = 0: the counter still wraps and sets COUNTFLAG, but no exception is pended. main stays in WFI (sequence tab 2).'; }
+    else { w.className = 'warnbox'; w.textContent = ''; }
+  }
+  $('loadctrl').onclick = function () { ctrl = 0x00000007; render(); };
+  render();
+})();
+</script>
+</body>
+</html>

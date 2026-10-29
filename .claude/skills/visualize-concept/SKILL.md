@@ -1,6 +1,6 @@
 ---
 name: visualize-concept
-description: Build an interactive HTML lesson page for a firmware program, peripheral or concept in this repo (event sequences between hardware, ISR and main; register bit builders; parameter-tuning labs; calculators; code steppers). Use when Purushoth asks to visualize, "make a page", "big pictures little words", or understand an interrupt/event flow, timing, a function or a register setup by stepping through it. Every number on the page is checked against the SVD, the manuals and the C source first.
+description: Build an interactive HTML lesson page for a firmware program, a peripheral, or any systems concept (OS scheduling, runtimes, Rust or C behaviour, protocols, system design): event sequences between actors, register bit builders, parameter-tuning labs, calculators, code steppers. Use when Purushoth asks to visualize, "make a page", "big pictures little words", or understand an event flow, timing, a function or a mechanism by stepping through it. Every claim on the page is checked against its authority first (SVD and manuals for hardware, source or docs plus a real run for software).
 ---
 
 # Visualize a concept
@@ -16,7 +16,25 @@ Pages share four files in `visualizations/shared/`. **Do not copy their code int
 | `split.js` | draggable divider, `Split.init(...)` |
 | `seq.js` | the sequence lesson: `Seq.mount(el, { lanes, scenarios, src, ... })`. API in `lessons.md` |
 
-Start from `template.html` in this folder. Working examples: `tim/capture.html` (sequence, tuning lab, register builder, calculators), `uart/cli-tx.html` (sequence with bug tabs and a derived Watch row), `uart/cli-numbers.html` (generated steps from user input), `uart/clock-drift.html` (budget table and a model with strips).
+Start from `template.html` in this folder (full page), or `template-minimal.html` (one sequence, no Watch, no Code) when the concept needs a single picture. The skeleton pieces (hero, flow strip, lessons, gotchas) are optional and can come in any order; keep only the ones the lesson needs. Working examples: `tim/capture.html` (sequence, tuning lab, register builder, calculators), `uart/cli-tx.html` (sequence with bug tabs and a derived Watch row), `uart/cli-numbers.html` (generated steps from user input), `uart/clock-drift.html` (budget table and a model with strips), `tim/channels.html` (a gate pipeline with a live analyser, no sequence), `spi/explorer.html` (a stepper in the window frame), `os/go-scheduler.html` (software concept: a sequence with Watch but no code, and a second sequence with neither).
+
+**Reading budget.** For one page read `SKILL.md`, `template.html` and the one example closest to your lesson. Open `lessons.md` (the `seq.js` gotchas are in it), `design-system.md`, `style.css` and `seq.js` only when you need them. The first run of a checker or the browser test will tell you what you got wrong.
+
+## Sources by topic
+
+Say on the page where each claim was checked. Pick the authority for the topic:
+
+| Topic | Authority | Check |
+|---|---|---|
+| STM32 peripherals | SVD, RM0390 (`pdf-mcp`) | bit positions from the SVD, tables with page numbers |
+| Cortex-M core | PM0214 | as above |
+| OS and kernel behaviour | the man page, kernel or POSIX docs | a small program, `strace`/`dtruss` or `perf` output for anything about behaviour |
+| Runtimes (Go, others) | the runtime source in the installed toolchain (`$(go env GOROOT)/src/runtime`) | quote function names and line numbers *with the version*, then run a small program to confirm the behaviour and get numbers |
+| Rust | the Rust reference, std docs | the compiler: real error text, `rustc --emit asm` for codegen claims |
+| C | the C standard, compiler docs | compile and run, `-S` for assembly |
+| System design | no single authority | label every number as an assumption and show its formula |
+
+Numbers you measured are *sample data*: give the machine, the tool version, and say it is one run. Never present a recalled number as measured.
 
 ## Principles
 
@@ -27,15 +45,15 @@ Start from `template.html` in this folder. Working examples: `tim/capture.html` 
 
 ## Workflow
 
-1. **Read the source** (`programs/<name>/…`, `lib/*.c`). Note constants, ISR logic, init order, and comments that give reasons. Line numbers move: always re-read the file now, never reuse numbers from an old page.
+1. **Read the source** (`programs/<name>/…`, `lib/*.c`). Note constants, ISR logic, init order, and comments that give reasons. Line numbers move: always re-read the file now, never reuse numbers from an old page. Get numbers with `grep -n`, not from memory.
 2. **Verify facts first**, before writing widget data:
    - Register names, addresses, bit positions: SVD (absolute path `…/c-programming/svd/stm32f446re.svd`, device name `STM32F446`). Never write a bit position from memory.
    - Tables and sequences (filter tables, enable order, flag-clear rules, tolerance tables): RM0390 or PM0214 via `pdf-mcp`, starting at `docs/contents.md`. Keep the page number and cite it on the page.
    - Derived numbers (tick, wrap time, BRR, byte time): compute them and compare with the source comments.
 3. **Pick 3 or 4 lessons** from `lessons.md`. Typical: a **sequence** (centrepiece), a **tuning lab** or **model** for the magic number, a **register builder**, one or two **calculators**, then short **init order** and **gotchas** lists.
-4. **Build** from `template.html`. Put source lines in the page as `[N, 'text']` literals, then run `tools/fix-src.py page.html source.c` so the text is exact. For input-driven steps (a function stepper), embed the source file as an array and slice it by line number.
-5. **Replay the real algorithm in JS** for anything with logic (ISR, parser, debounce). Never hand-write verdicts or intermediate values. The sample run must reproduce the numbers in the source comments.
-6. **Test in the browser.** `tools/browser-test.sh /abs/page.html "js" out.png` runs Chrome headless, clicks through the page with your JS, prints console output and saves a screenshot. Check: no console errors, the highlighted source lines are the ones you meant, both themes, a narrow width, and the interactions you added. Read the PNG.
+4. **Build** from `template.html`. Put source lines in the page as `[N, 'text']` literals, then run `tools/fix-src.py page.html source.c --check`. It fixes wrong text (drop `--check`) and **warns when a number is stale** (the text sits at another line). It cannot know a number is the *right* one for the step: after it passes, confirm each highlighted line contains the identifier the step is about. For input-driven steps (a function stepper), embed the source file as an array and slice it by line number. Seq prints console warnings for highlights that are not in `src`; treat any as a bug.
+5. **Replay the real algorithm in JS** for anything with logic (ISR, parser, debounce). Never hand-write verdicts or intermediate values. The sample run must reproduce the numbers in the source comments. When one page shows the same event in two places (a sequence and a lab), make both read from one model; check their **phase** too (does the first arrival start at t = 0 or one byte-time in?) and compare the two outputs.
+6. **Test in the browser.** `tools/browser-test.sh /abs/page.html "js" out.png [--mobile] [--at=#id]` runs Chrome headless, runs your JS, prints console output and saves a screenshot. `--mobile` renders at 390px; `--at=#id` crops to a section (headless always captures from the top). Turn checks into console assertions (`console.log('WATCH', ...)`, the highlighted `.ln.cur` line numbers, verdict text) rather than only reading the PNG. Check: no console errors or Seq warnings, the highlighted source lines are the ones you meant, both themes, 390px, and each interaction you added. Then read the PNG.
 7. **Report**: what was verified and where (SVD fields, manual pages), what is sample or illustrative data, what is a simplified model, and what was not verified.
 
 ## Rules that came from review

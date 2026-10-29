@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Button interrupt, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.prrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 4px;font-size:12px;color:var(--ink-3)}
+.prlamp{font:500 13px "JetBrains Mono",monospace;padding:4px 10px;border:1px solid var(--line);border-radius:4px;background:var(--card-2);color:var(--ink-3)}
+.prlamp.on{color:var(--bad);border-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,var(--card))}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">button_irq.c <span>one press, one toggle</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#guard">The 20 ms guard</a>
+    <a class="l" href="#registers">Registers</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/button_irq.c</div>
+    <h1 style="margin-top:14px">A falling edge wakes the core. <em>One press, one toggle.</em></h1>
+    <p class="serif">PC13 sits high behind a pull-up. Pressing it pulls the line low, SYSCFG hands that edge to EXTI line 13, and IRQ 40 runs the handler. The handler clears the flag and toggles the LED, as long as 20 ms have passed since the last accepted press.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sequence">Step through a press →</a>
+      <a class="btn" href="#guard">Tune the guard</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Pin</span><b>PC13 · input · pull-up</b></div>
+    <div><span>Edge</span><b>falling only</b></div>
+    <div><span>Route</span><b>EXTICR4 · EXTI13 = PC</b></div>
+    <div><span>EXTI</span><b>IMR · FTSR · PR13</b></div>
+    <div><span>IRQ</span><b>40 · EXTI15_10 · 0xE0</b></div>
+    <div><span>Priority</span><b>2 (SysTick is 0)</b></div>
+    <div><span>Guard</span><b>20 ms from last press</b></div>
+    <div><span>Time base</span><b>SysTick 1 ms</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>PC13 + pull-up</b><span>released = high, pressed = low</span></div>
+  <div class="s hw"><i>HW 2</i><b>EXTI line 13</b><span>falling edge latches PR13</span></div>
+  <div class="s hw"><i>HW 3</i><b>NVIC</b><span>IRQ 40 pending, vector 0xE0</span></div>
+  <div class="s"><i>CODE 4</i><b>Handler</b><span>clear PR13, check 20 ms</span></div>
+  <div class="s"><i>CODE 5</i><b>Toggle</b><span>one BSRR write on PA5</span></div>
+  <div class="s hw"><i>HW 6</i><b>LED</b><span>changes once per press</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div>
+    <h2>One press, five stops</h2>
+    <p>The first tab is a clean press. The second adds the bounce a mechanical contact really produces and shows the guard absorbing it. The third is a bug tab: it never clears PR13, so the interrupt re-enters forever.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="guard">
+  <div class="sh"><div class="eyebrow">02 · sample data · the guard replayed</div>
+    <h2>Is 20 ms the right number?</h2>
+    <p>Each row is a falling edge. The guard compares the current millisecond with the last <em>accepted</em> press, not with the previous edge. Drag the threshold and watch presses get swallowed or bounce get counted twice.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <label>Sample data
+        <span class="seg" id="dset"><button aria-pressed="true" data-d="normal">One press</button><button aria-pressed="false" data-d="double">Fast double tap</button><button aria-pressed="false" data-d="glitch">Press + glitch</button></span></label>
+      <label>Guard <input type="range" id="slider" min="1" max="100" value="20" aria-label="Debounce guard in milliseconds"></label>
+      <span class="win-val" id="wval"></span>
+      <button class="btn sm" id="wcode">Use 20 ms (the code)</button>
+    </div>
+    <div class="score" id="score"></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>#</th><th>Time (ms)</th><th>Quiet (ms)</th><th>log · 0.3 ms → 3 s</th><th>ISR says</th><th>Really was</th><th></th></tr></thead>
+      <tbody id="drows"></tbody>
+    </table></div>
+    <p class="hint" id="dhint"></p>
+  </div></div>
+</section>
+
+<section id="registers">
+  <div class="sh"><div class="eyebrow">03 · the numbers</div>
+    <h2>Two registers before the edge means anything</h2>
+    <p>SYSCFG picks the port for line 13. EXTI picks the edge and lets the request through. Offsets and bit fields from the SVD; the port codes and the clear rule from RM0390 p. 196 and p. 245.</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>SYSCFG-&gt;EXTICR[3] <span>0x40013814 · EXTI12..15</span></h3>
+      <div class="inl">EXTI13 ← <select id="port">
+        <option value="0">PA13</option><option value="1">PB13</option><option value="2" selected>PC13</option>
+        <option value="3">PD13</option><option value="4">PE13</option><option value="5">PF13</option><option value="6">PG13</option>
+      </select></div>
+      <div class="out" id="o-exticr"></div>
+      <div class="kv" id="kv-exticr"></div>
+      <div class="warnbox" id="w-exticr"></div>
+    </div>
+    <div class="card">
+      <h3>EXTI line 13 <span>0x40013C00</span></h3>
+      <div class="bits" style="max-width:300px"><div class="row" id="b-exti"></div></div>
+      <div class="prrow">
+        <span>PR13</span><span class="prlamp" id="prlamp">0</span>
+        <button class="btn sm ghost" id="edge">simulate falling edge</button>
+        <button class="btn sm ghost" id="clr">write 1 to clear</button>
+      </div>
+      <div class="kv" id="kv-exti"></div>
+      <div class="warnbox" id="w-exti"></div>
+      <div style="margin-top:10px"><button class="btn sm" id="loadexti">Load the program's values</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">04 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>PR13 clears by writing 1</b>Not 0. Clearing it is what ends the request; skip it and the handler is entered again the moment it returns (tab 3).</div>
+    <div><b>The vector is shared</b>Lines 10 to 15 all use IRQ 40. Check <code>PR &amp; PR13</code> first, or you act on another pin's edge.</div>
+    <div><b>The guard starts at the last press</b>It is a lockout, not a quiet-time measure. Two real presses 10 ms apart become one toggle (lab, double tap).</div>
+    <div><b>Both triggers double the toggles</b>With RTSR set, the release is an interrupt too. This handler never reads the pin, so it toggles on both edges.</div>
+    <div><b>Resolution is 1 ms</b>The guard reads SysTick ticks. Edges inside the same millisecond all see quiet = 0, whatever the sub-millisecond timing.</div>
+    <div><b>No SysTick, no presses</b>Without the 1 ms tick, <code>g_ms_ticks − g_last_press_ms</code> is always 0, so every edge is rejected. The button looks dead.</div>
+  </div>
+</section>
+
+<footer>Source: programs/button_irq.c (lines 24–106) · RM0390 §8.2.6 p. 196 (EXTICR4, PC = 0010), §10.2.4 p. 241 and §10.3.6 p. 245 (PR clears by writing 1), Table 38 p. 237 (IRQ 40, 0xE0) · PM0214 §4.3.2 p. 210 (ISER1 bit 8) · SVD: svd/stm32f446re.svd</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence: programs/button_irq.c ---------- */
+(function () {
+  var SRC = [
+    [24, 'static volatile uint32_t g_ms_ticks;'], [25, 'static volatile uint32_t g_last_press_ms;'],
+    [0, ''],
+    [28, 'void SysTick_Handler(void)'], [29, '{'], [30, '    g_ms_ticks++;'], [31, '}'],
+    [0, ''],
+    [34, 'void EXTI15_10_IRQHandler(void)'], [35, '{'],
+    [36, '    if ((EXTI->PR & EXTI_PR_PR13) != 0u) {'],
+    [37, '        EXTI->PR = EXTI_PR_PR13;                 /* write 1 to clear pending */'],
+    [39, '        if ((int32_t)(g_ms_ticks - g_last_press_ms) >= (int32_t)DEBOUNCE_MS) {'],
+    [40, '            g_last_press_ms = g_ms_ticks;'],
+    [42, '            if ((GPIOA->ODR & (1u << LED_PIN)) != 0u) {'],
+    [43, '                GPIOA->BSRR = GPIO_BSRR_BR5;     /* was on  -> off */'],
+    [44, '            } else {'],
+    [45, '                GPIOA->BSRR = GPIO_BSRR_BS5;     /* was off -> on  */'],
+    [46, '            }'],
+    [47, '        }'], [48, '    }'], [49, '}'],
+    [0, ''],
+    [64, '    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;         /* GPIOC clock */'],
+    [66, '    GPIOC->MODER &= ~GPIO_MODER_MODER13;         /* PC13 = input */'],
+    [68, '    GPIOC->PUPDR |= GPIO_PUPDR_PUPDR13_0;        /* pull-up: released = high */'],
+    [0, ''],
+    [82, '    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;        /* SYSCFG clock */'],
+    [85, '    SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR4_EXTI13;'],
+    [86, '    SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PC;'],
+    [88, '    EXTI->IMR  |= EXTI_IMR_MR13;                 /* unmask line 13 (interrupt) */'],
+    [89, '    EXTI->FTSR |= EXTI_FTSR_TR13;                /* trigger on falling edge */'],
+    [90, '    EXTI->RTSR &= ~EXTI_RTSR_TR13;               /* not on rising edge */'],
+    [92, '    NVIC_SetPriority(EXTI15_10_IRQn, 2u);        /* lower priority than SysTick */'],
+    [93, '    NVIC_EnableIRQ(EXTI15_10_IRQn);              /* NVIC ISER bit 8 (IRQ 40) */'],
+    [0, ''],
+    [103, '    for (;;) {'], [104, '        __WFI();   /* sleep until SysTick ticks or the button is pressed */'], [105, '    }'], [106, '}']
+  ];
+
+  var B = { pr: 0, pend: 'no', ms: '1 000', last: '0', led: 'off', main: 'WFI' };
+  function base(o) { var r = {}, k; for (k in B) r[k] = B[k]; for (k in o) r[k] = o[k]; return r; }
+
+  var SCEN = [
+    { id: 'press', tab: 'one_press.seq', init: base({}), steps: [
+      { f: 'pin', t: 'exti', label: 'PC13 falls', title: 'The button pulls the line low', desc: 'PC13 is an input with the internal pull-up, so it sits at 3V3 until the contact closes. SYSCFG has already pointed EXTI line 13 at port C.', code: '/* hardware */  PC13: 1 → 0', lines: [68] },
+      { f: 'exti', t: 'exti', label: 'PR13 = 1', title: 'EXTI latches the edge', desc: 'FTSR13 selects falling edges and IMR13 unmasks the line, so the edge sets the pending bit.', code: '/* hardware */  EXTI_PR.PR13 = 1', lines: [88, 89], set: { pr: 1 } },
+      { f: 'exti', t: 'nvic', label: 'IRQ 40 pending', title: 'The request reaches the NVIC', desc: 'EXTI line 13 is one of six lines that share IRQ 40, EXTI15_10.', code: '/* hardware */  NVIC pending, IRQ 40', lines: [93], set: { pend: 'yes' } },
+      { f: 'nvic', t: 'isr', label: 'exception 56', kind: 'irq', title: 'The core takes the interrupt', desc: 'IRQ 40 is exception 40 + 16 = 56, vector 0x40 + 4×40 = 0xE0. main was asleep in __WFI().', code: 'void EXTI15_10_IRQHandler(void)', lines: [34], set: { main: 'running' } },
+      { f: 'isr', t: 'isr', label: 'PR13 set?', title: 'Confirm which line', desc: 'Lines 10 to 15 share this vector, so the handler only continues if line 13 is the one pending.', code: 'if ((EXTI->PR & EXTI_PR_PR13) != 0u) {', lines: [36] },
+      { f: 'isr', t: 'isr', label: 'PR13 = 1', kind: 'good', title: 'Clear the request', desc: 'Writing 1 clears the bit. Writing 0 would do nothing. The request drops as soon as this lands.', code: 'EXTI->PR = EXTI_PR_PR13;', lines: [37], set: { pr: 0, pend: 'no' } },
+      { f: 'isr', t: 'isr', label: 'quiet 1 000 ≥ 20', title: 'The guard passes', desc: 'One second has passed since boot and g_last_press_ms is 0, so this is a real press. It becomes the new reference.', code: 'if ((int32_t)(g_ms_ticks - g_last_press_ms) >= 20) {', lines: [39], set: { last: '1 000' } },
+      { f: 'isr', t: 'isr', label: 'PA5 on', title: 'Toggle once', desc: 'ODR bit 5 was 0, so the else branch sets it with BSRR. The handler never reads the pin back.', code: 'GPIOA->BSRR = GPIO_BSRR_BS5;', lines: [42, 45], set: { led: 'on' } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Back to WFI', desc: 'main resumes the __WFI() it was in and waits for the next interrupt.', code: '}', lines: [49], set: { main: 'WFI' }, verdict: 'good', verdictText: 'One press, one toggle, and the CPU asleep again.' }
+    ] },
+    { id: 'bounce', tab: 'bounce.seq', init: base({}), steps: [
+      { f: 'pin', t: 'exti', label: 'edge 1', title: 'First falling edge', desc: 'The contact closes. Mechanically this is only the first of several closures in the next few milliseconds.', code: '/* hardware */  PC13: 1 → 0', lines: [68] },
+      { f: 'exti', t: 'exti', label: 'PR13 = 1', title: 'Latched', desc: 'Same path as the clean press.', code: '/* hardware */  PR13 = 1', lines: [88, 89], set: { pr: 1 } },
+      { f: 'exti', t: 'nvic', label: 'IRQ 40', title: 'Request pended', desc: 'The NVIC pends IRQ 40.', code: '/* hardware */', lines: [93], set: { pend: 'yes' } },
+      { f: 'nvic', t: 'isr', label: 'enter handler', kind: 'irq', title: 'Handler runs', desc: 'First entry of this press.', code: 'void EXTI15_10_IRQHandler(void)', lines: [34], set: { main: 'running' } },
+      { f: 'isr', t: 'isr', label: 'clear PR13', title: 'Clear the flag', desc: 'Written as 1, so the request goes away.', code: 'EXTI->PR = EXTI_PR_PR13;', lines: [37], set: { pr: 0, pend: 'no' } },
+      { f: 'isr', t: 'isr', label: 'quiet 1 000 → accept', title: 'Count the press', desc: 'Plenty of time since the last press, so the guard passes and the reference moves to 1 000 ms.', code: 'g_last_press_ms = g_ms_ticks;', lines: [39, 40], set: { last: '1 000' } },
+      { f: 'isr', t: 'isr', label: 'PA5 on', kind: 'good', title: 'One toggle', desc: 'The LED changes once for this contact closure.', code: 'GPIOA->BSRR = GPIO_BSRR_BS5;', lines: [42, 45], set: { led: 'on' } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Back to main', desc: 'The first edge is done. The contact is still not settled.', code: '}', lines: [49], set: { main: 'WFI' } },
+      { f: 'pin', t: 'exti', label: 'edges 2–5', title: 'The contact chatters', desc: 'Four more falling edges at +0.4, +1.1, +2.3 and +3.6 ms. Each one takes the same EXTI → NVIC → handler path.', code: '/* hardware */  PR13 = 1 again', lines: [89], set: { pr: 1, pend: 'yes' } },
+      { f: 'isr', t: 'isr', label: 'quiet 0, 1, 3 < 20', kind: 'good', title: 'All three rejected', desc: 'The guard counts from the last accepted press (1 000 ms). All three edges fall inside the 20 ms lockout, so none toggles the LED.', code: 'if ((int32_t)(g_ms_ticks - g_last_press_ms) >= 20) {   /* false */', lines: [39], set: { pr: 0, pend: 'no' } },
+      { f: 'isr', t: 'main', label: 'sleep', title: 'Done', desc: 'Five edges, one toggle. The guard turned a noisy contact into one clean action.', code: '__WFI();', lines: [104], set: { main: 'WFI' }, verdict: 'good', verdictText: 'Five falling edges became one toggle, because only the first was 20 ms away from the previous press.' }
+    ] },
+    { id: 'noclear', tab: 'no_clear.seq', bug: true, dim: [37],
+      sheetNote: 'This tab removes line 37, the write that clears PR13. The rest of the handler is unchanged.',
+      init: base({}), steps: [
+      { f: 'pin', t: 'exti', label: 'PC13 falls', title: 'A normal press', desc: 'The edge and the route are exactly the same as the clean case.', code: '/* hardware */  PC13: 1 → 0', lines: [68] },
+      { f: 'exti', t: 'exti', label: 'PR13 = 1', title: 'Latched', desc: 'EXTI sets the pending bit.', code: '/* hardware */  PR13 = 1', lines: [88, 89], set: { pr: 1 } },
+      { f: 'exti', t: 'nvic', label: 'IRQ 40', title: 'Request pended', desc: 'Same as before.', code: '/* hardware */', lines: [93], set: { pend: 'yes' } },
+      { f: 'nvic', t: 'isr', label: 'enter handler', kind: 'irq', title: 'Handler runs', desc: 'It checks PR13, finds it set, and continues.', code: 'void EXTI15_10_IRQHandler(void)', lines: [34, 36], set: { main: 'running' } },
+      { f: 'isr', t: 'isr', label: 'no clear', kind: 'bad', title: 'The flag stays set', desc: 'Line 37 is gone. The handler does not write PR13, so the request is still there.', code: '/* missing: EXTI->PR = EXTI_PR_PR13; */', lines: [36], set: { pr: 1 } },
+      { f: 'isr', t: 'isr', label: 'quiet 1 000 → accept', title: 'This press still counts', desc: 'The guard passes once, so the LED toggles and the reference moves.', code: 'GPIOA->BSRR = GPIO_BSRR_BS5;', lines: [39, 45], set: { led: 'on', last: '1 000' } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'The handler returns…', desc: '…into a pending IRQ, because PR13 was never cleared.', code: '}', lines: [49], set: { main: 'starved' } },
+      { f: 'nvic', t: 'isr', label: 'entered again', kind: 'bad', title: 'Immediately re-entered', desc: 'The NVIC still sees IRQ 40 pending. The core takes the exception again before main can run a single instruction.', code: 'void EXTI15_10_IRQHandler(void)', lines: [34] },
+      { f: 'isr', t: 'isr', label: 'quiet 0 → reject', kind: 'bad', title: 'Nothing left to do', desc: 'PR13 is still set, but the guard now sees 0 ms since the accepted press, so it returns without toggling.', code: '/* repeat forever */', lines: [39], set: { pr: 1 } },
+      { f: 'isr', t: 'main', label: 'main starved', kind: 'bad', title: 'A loop with no exit', desc: 'Each return re-enters the handler. main never resumes, and no new press is needed.', code: '/* no path back to main */', verdict: 'bad', verdictText: 'One press locks the CPU in the handler. Writing 1 to PR13 is the only thing that ends the request.' }
+    ] }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'programs/button_irq.c', key: 'buttonIrqSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'pin', t: 'PC13', s: 'button · pull-up' },
+      { id: 'exti', t: 'EXTI', s: 'line 13 · PR' },
+      { id: 'nvic', t: 'NVIC', s: 'IRQ 40' },
+      { id: 'isr', t: 'Handler', s: 'EXTI15_10_IRQHandler' },
+      { id: 'main', t: 'main', s: 'for (;;) + WFI' }
+    ]
+  });
+})();
+
+/* ---------- guard lab (replays the handler's rule) ---------- */
+(function () {
+  var DATA = {
+    normal: {
+      hint: 'One press: the contact closes five times in 3.6 ms. Any guard above the longest bounce gap keeps it to one toggle.',
+      ev: [[1000.0, 'press'], [1000.4, 'bounce'], [1001.1, 'bounce'], [1002.3, 'bounce'], [1003.6, 'bounce']]
+    },
+    double: {
+      hint: 'Two real taps 10 ms apart. A guard above 10 ms swallows the second one — the cost of the lockout.',
+      ev: [[1000.0, 'press'], [1000.5, 'bounce'], [1010.0, 'press'], [1010.6, 'bounce']]
+    },
+    glitch: {
+      hint: 'A real press, then one isolated glitch 5 ms later. Whether the guard catches it depends on the number.',
+      ev: [[1000.0, 'press'], [1000.6, 'bounce'], [1005.0, 'bounce']]
+    }
+  };
+  var ds = 'normal', win = 20;
+  var LOG_LO = Math.log10(0.3), LOG_HI = Math.log10(3000);
+  function pos(ms) { return Math.max(0, Math.min(100, (Math.log10(Math.max(ms, 0.3)) - LOG_LO) / (LOG_HI - LOG_LO) * 100)); }
+
+  function run(w) {
+    var last = 0, toggles = 0, real = 0, dbl = 0, miss = 0, rows = [], bq = [], pq = [];
+    DATA[ds].ev.forEach(function (e, i) {
+      var t = Math.floor(e[0]);
+      var quiet = t - last;
+      var accept = quiet >= w;
+      var truth = e[1];
+      var status = 'ok', label = 'correct';
+      if (truth === 'press') { real++; pq.push(quiet); }
+      if (truth === 'bounce') bq.push(quiet);
+      if (accept) {
+        toggles++; last = t;
+        if (truth === 'bounce') { status = 'bad'; label = 'counted twice'; dbl++; }
+      } else if (truth === 'press') { status = 'bad'; label = 'press swallowed'; miss++; }
+      else { label = 'ignored, correct'; }
+      rows.push({ i: i + 1, t: t, quiet: quiet, accept: accept, truth: truth, status: status, label: label });
+    });
+    return { rows: rows, toggles: toggles, real: real, dbl: dbl, miss: miss };
+  }
+
+  function safeRange() {
+    var lo = null, hi = null;
+    for (var w = 1; w <= 100; w++) {
+      var t = run(w);
+      if (t.dbl === 0 && t.miss === 0) { if (lo === null) lo = w; hi = w; }
+    }
+    return lo === null ? 'none in 1–100 ms' : lo + '–' + hi + ' ms';
+  }
+
+  function render() {
+    var r = run(win), safe = safeRange();
+    $('wval').innerHTML = win + '<small>ms guard</small>';
+    var ok = r.dbl === 0 && r.miss === 0;
+    $('score').innerHTML =
+      '<span class="chip ' + (ok ? 'ok' : 'bad') + '">toggles ' + r.toggles + ' / ' + r.real + ' real press' + (r.real === 1 ? '' : 'es') + '</span>' +
+      '<span class="chip ' + (r.dbl ? 'bad' : '') + '">counted twice ' + r.dbl + '</span>' +
+      '<span class="chip ' + (r.miss ? 'bad' : '') + '">swallowed ' + r.miss + '</span>' +
+      '<span class="chip">safe here ' + safe + '</span>';
+    var tb = $('drows'); tb.textContent = '';
+    r.rows.forEach(function (x) {
+      var tr = document.createElement('tr'); if (x.status === 'bad') tr.className = 'wrong';
+      tr.innerHTML = '<td>' + x.i + '</td><td>' + x.t + '</td><td>' + x.quiet + '</td>' +
+        '<td class="bar"><div class="bartrack"><div class="fill" style="width:' + Math.max(1, pos(x.quiet)) + '%;background:' + (x.accept ? 'var(--ok)' : 'var(--ink-3)') + '"></div><div class="thr" style="left:' + pos(win) + '%"></div></div></td>' +
+        '<td>' + (x.accept ? '<span class="tag press">toggle</span>' : '<span class="tag release">ignored</span>') + '</td>' +
+        '<td><span class="tag ' + (x.truth === 'press' ? 'press' : 'bounce') + '">' + x.truth + '</span></td>' +
+        '<td class="st-' + x.status + '">' + (x.status === 'ok' ? '✓' : x.label) + '</td>';
+      tb.appendChild(tr);
+    });
+    $('dhint').textContent = DATA[ds].hint + ' The guard compares whole milliseconds with the last accepted press, so sub-millisecond detail in this sample is already rounded.';
+  }
+
+  $('slider').addEventListener('input', function () { win = +this.value; render(); });
+  $('wcode').onclick = function () { win = 20; $('slider').value = 20; render(); };
+  Array.prototype.forEach.call($('dset').querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      ds = b.dataset.d;
+      Array.prototype.forEach.call($('dset').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      render();
+    };
+  });
+  render();
+})();
+
+/* ---------- EXTICR4 port selector ---------- */
+(function () {
+  var PORTS = ['PA', 'PB', 'PC', 'PD', 'PE', 'PF', 'PG'];
+  function render() {
+    var p = +$('port').value;
+    $('o-exticr').innerHTML = 'SYSCFG-&gt;EXTICR[3] = <span>0x' + ((p << 4) >>> 0).toString(16).toUpperCase().padStart(8, '0') + '</span>';
+    $('kv-exticr').innerHTML = [
+      ['EXTI13 field [7:4]', PORTS[p] + '13 = ' + p.toString(2).padStart(4, '0')],
+      ['EXTI12 / 14 / 15', '0000 (untouched)'],
+      ['Offset', '0x14 · base 0x40013800']
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+    var w = $('w-exticr');
+    if (p !== 2) { w.className = 'warnbox show'; w.textContent = 'The handler tests PR13, but the button is PC13. Unless line 13 selects port C, the press never reaches it.'; }
+    else { w.className = 'warnbox'; w.textContent = ''; }
+  }
+  $('port').addEventListener('change', render); render();
+})();
+
+/* ---------- EXTI line 13 model ---------- */
+(function () {
+  var imr = 1, ftsr = 1, rtsr = 0, pr = 0;
+  function render() {
+    var row = $('b-exti'); row.textContent = '';
+    [['IMR · 13', imr], ['FTSR · 13', ftsr], ['RTSR · 13', rtsr]].forEach(function (f, i) {
+      var d = document.createElement('div');
+      d.className = 'bit' + (f[1] ? ' on' : '');
+      d.innerHTML = f[1] + '<small>' + f[0] + '</small>';
+      d.tabIndex = 0; d.setAttribute('role', 'switch'); d.setAttribute('aria-checked', f[1] ? 'true' : 'false');
+      var flip = function () { if (i === 0) imr ^= 1; else if (i === 1) ftsr ^= 1; else rtsr ^= 1; render(); };
+      d.onclick = flip;
+      d.onkeydown = function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } };
+      row.appendChild(d);
+    });
+    $('prlamp').textContent = pr;
+    $('prlamp').className = 'prlamp' + (pr ? ' on' : '');
+    var trig = (rtsr && ftsr) ? 'both edges' : ftsr ? 'falling only' : rtsr ? 'rising only' : 'none';
+    $('kv-exti').innerHTML = [
+      ['Trigger', trig],
+      ['Mask', imr ? 'unmasked (IMR13 = 1)' : 'masked (no request)'],
+      ['PR13', pr ? 'set, waiting for a write of 1' : 'clear']
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+    var w = $('w-exti'), msg = '';
+    if (!imr) msg = 'IMR13 = 0: an edge still sets PR13, but no request reaches the NVIC. Nothing wakes main.';
+    else if (!ftsr && !rtsr) msg = 'No trigger selected: nothing latches, so PR13 stays clear.';
+    else if (ftsr && rtsr) msg = 'Both triggers: press and release each raise IRQ 40, and this handler never reads the pin, so one press toggles twice.';
+    else if (pr) msg = 'PR13 is set. It clears only when software writes 1 to it (RM0390 p. 245).';
+    w.className = 'warnbox' + (msg ? ' show' : ''); w.textContent = msg;
+  }
+  $('edge').onclick = function () {
+    var edgeOk = (rtsr || ftsr);
+    if (edgeOk) pr = 1;
+    render();
+  };
+  $('clr').onclick = function () { pr = 0; render(); };
+  $('loadexti').onclick = function () { imr = 1; ftsr = 1; rtsr = 0; pr = 0; render(); };
+  render();
+})();
+</script>
+</body>
+</html>

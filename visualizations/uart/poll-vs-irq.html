@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why we need the ring · uart_echo_poll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.bstage{margin:4px 0 0}
+.lmarks{position:relative;height:18px;margin-bottom:3px}
+.lmarks i{position:absolute;top:2px;bottom:2px;width:1px;background:var(--ember);opacity:.6}
+.lmarks b{position:absolute;top:-2px;font:400 9.5px "JetBrains Mono",monospace;color:var(--ember);white-space:nowrap}
+.brow{display:flex;gap:2px}
+.bcell{flex:1;min-width:0;height:34px;border:1px solid var(--line);border-radius:3px;display:grid;place-items:center;font:400 12px "JetBrains Mono",monospace;color:var(--ink-2);background:var(--card)}
+.bcell.kept{border-color:color-mix(in srgb,var(--ok) 55%,transparent);color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,var(--card))}
+.bcell.lost{color:var(--ink-3);text-decoration:line-through}
+.termline{font:400 12px/1.75 "JetBrains Mono",monospace;background:var(--card-2);border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;margin-top:12px;overflow-x:auto;white-space:nowrap}
+.termline .tl-lab{color:var(--ink-3)}
+.termline .tl-out{color:var(--ink)}
+.termline .tl-mark{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">uart_echo_poll.c <span>polling the receiver</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#timeline">When it breaks</a>
+    <a class="l" href="#numbers">The numbers</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/uart_echo_poll.c</div>
+    <h1 style="margin-top:14px">The bytes keep coming. <em>The loop is asleep.</em></h1>
+    <p class="serif">A byte arrives every 87 µs. This loop looks at the USART once every millisecond, so eleven bytes queue up behind one register. The hardware keeps the first and throws the rest away. The <code>!</code> on screen is the only trace.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sequence">Step through one look →</a>
+      <a class="btn" href="#timeline">Find the breaking point</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Link</span><b>115200 · 8N1 · 10 bits</b></div>
+    <div><span>BRR</span><b>139 = 0x008B</b></div>
+    <div><span>One byte</span><b>86.9 µs</b></div>
+    <div><span>Look interval</span><b>≈ 1 ms</b></div>
+    <div><span>Bytes per look</span><b>11.5</b></div>
+    <div><span>Ceiling</span><b>1 000 B/s</b></div>
+    <div><span>Overrun flag</span><b>SR.ORE · bit 3</b></div>
+    <div><span>ORE clears</span><b>read SR, then DR</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>PA3 wire</b><span>one byte every 86.9 µs</span></div>
+  <div class="s hw"><i>HW 2</i><b>Shift → RDR</b><span>then RXNE = 1</span></div>
+  <div class="s hw"><i>HW 3</i><b>Next byte</b><span>RXNE still 1 → ORE, byte lost</span></div>
+  <div class="s"><i>CODE 4</i><b>delay_ms(1)</b><span>eleven bytes pass per look</span></div>
+  <div class="s"><i>CODE 5</i><b>SR, DR, echo</b><span>one byte out, one <code>!</code> out</span></div>
+  <div class="s hw"><i>HW 6</i><b>Terminal</b><span>“t!r!” instead of the line</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div>
+    <h2>One millisecond, one look</h2>
+    <p>The first tab is the real program at 115200. The second runs the same code at 9600, where it happens to work. The third is a bug tab: it never finishes the sequence that clears ORE.</p></div>
+  <div id="seq"></div>
+
+  <div class="two" style="margin-top:14px">
+    <div class="card">
+      <h3>Why the ring fixes it <span>uart/ring-buffer.html</span></h3>
+      <p style="margin:0 0 10px">Turn on <code>RXNEIE</code> and the USART interrupts on the first byte of a burst. The handler reads <code>DR</code> within a few microseconds, long before the next byte completes, so ORE never sets. main then drains a ring at its own pace, and nothing is dropped while it prints.</p>
+      <a class="btn sm ghost" href="ring-buffer.html">Open the ring buffer lesson →</a>
+    </div>
+    <div class="card">
+      <h3>What this loop can never do <span>ceiling</span></h3>
+      <p style="margin:0 0 10px">One look per millisecond is at most 1 000 bytes per second. The wire delivers 11 511. Speeding up the loop body does not help while the sleep is there; the sleep is the design.</p>
+      <p style="margin:0" class="hint">Human typing hides the bug: keystrokes are ~100 ms apart, so each one is read safely. Paste a line and the failures appear.</p>
+    </div>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="sh"><div class="eyebrow">02 · sample data · simplified model</div>
+    <h2>When does the look become too slow?</h2>
+    <p>Nineteen bytes arrive back to back. Drag the look interval and change the baud. A byte survives only if the loop looks at it before the next one completes.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <label>Baud <select id="baud"></select></label>
+      <label>Look interval <input type="range" id="pd" min="0" max="100" value="86" aria-label="How often the loop reads the USART"></label>
+      <span class="win-val" id="pval"></span>
+      <button class="btn sm" id="pcode">Use the code's values</button>
+    </div>
+    <div class="score" id="chips"></div>
+    <div class="bstage">
+      <div class="lmarks" id="lmarks"></div>
+      <div class="brow" id="brow"></div>
+    </div>
+    <div class="termline" id="term"></div>
+    <p class="verdict-line" id="pverdict" style="margin:2px 0 0"></p>
+    <p class="hint" id="phint"></p>
+  </div></div>
+</section>
+
+<section id="numbers">
+  <div class="sh"><div class="eyebrow">03 · the numbers</div>
+    <h2>Baud, BRR, byte time</h2>
+    <p>The program runs on the 16 MHz HSI reset clock; it never starts the PLL. <code>BRR</code> is <code>f<sub>CK</sub> ÷ baud</code> rounded, because USARTDIV is coded in sixteenths (RM0390 p. 788).</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>USART2 clock and divider <span>16 MHz</span></h3>
+      <div class="inl">Baud <input type="number" id="baud2" value="115200" min="1200" max="3000000" step="100">
+        <button class="btn sm ghost" data-b="9600">9600</button>
+        <button class="btn sm ghost" data-b="115200">115200</button>
+        <button class="btn sm ghost" data-b="460800">460800</button></div>
+      <div class="big" id="brrout"></div>
+      <div class="kv" id="kv-brr"></div>
+      <div class="warnbox" id="brrwarn">Error above 2 %. Check that the receiver can tolerate it before using this rate.</div>
+    </div>
+    <div class="card">
+      <h3>What the loop can carry <span>one look per period</span></h3>
+      <div class="inl">Look every <input type="number" id="pk" value="1000" min="10" max="100000" step="10"> µs</div>
+      <div class="big" id="capout"></div>
+      <div class="kv" id="kv-cap"></div>
+      <p class="hint" style="margin-top:8px">The loop reads at most one byte per look, so its ceiling is <code>1 / period</code>, whatever the baud.</p>
+    </div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">04 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>ORE needs both reads</b>Reading <code>SR</code> alone does not clear it. The sequence is SR read, then DR read (RM0390 p. 815).</div>
+    <div><b>ORE without RXNE is real</b>A byte can be lost exactly when the previous one is read, leaving ORE set with nothing to read. Read DR anyway, to finish the clear.</div>
+    <div><b>RDR keeps the first byte</b>While RXNE is set, new bytes overwrite the shift register, not RDR. So the byte you read is the oldest one (RM0390 p. 784).</div>
+    <div><b>One <code>!</code> is not one lost byte</b>The flag says at least one byte was lost. It cannot count them; this program can only mark where the gap ended.</div>
+    <div><b>The sleep is the bottleneck</b>At 115200 the loop must look faster than one byte, 86.9 µs, to lose nothing. A 1 ms sleep is eleven bytes too slow.</div>
+    <div><b>Slow typing hides it</b>Keystrokes are far apart. Only a pasted line or a fast sender fills the gap between looks.</div>
+  </div>
+</section>
+
+<footer>Source: programs/uart_echo_poll.c (lines 22–100) · RM0390 §25.4.3 p. 784 (overrun), §25.6.1 USART_SR.ORE p. 815, USART_BRR p. 788 · SVD: svd/stm32f446re.svd</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence: programs/uart_echo_poll.c ---------- */
+(function () {
+  var SRC = [
+    [22, 'static void systick_init(void)'], [23, '{'],
+    [25, '    SysTick->LOAD = (CPU_CLK_HZ / 1000u) - 1u;'],
+    [0, ''],
+    [30, 'static void delay_ms(uint32_t ms)'], [31, '{'], [32, '    while (ms-- > 0u) {'],
+    [33, '        while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0u) {'],
+    [36, '    }'], [37, '}'],
+    [0, ''],
+    [56, '    USART2->CR1 = 0u;'], [59, '    USART2->BRR = UART_BRR;'],
+    [62, '    USART2->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;'],
+    [0, ''],
+    [65, 'static void uart_write_char(char ch)'], [66, '{'],
+    [67, '    while ((USART2->SR & USART_SR_TXE) == 0u) {'],
+    [69, '    USART2->DR = (uint8_t)ch;'], [70, '}'],
+    [0, ''],
+    [72, 'int main(void)'], [73, '{'], [74, '    uart_init();'], [75, '    systick_init();'],
+    [77, '    for (;;) {'], [78, '        delay_ms(1u);   /* deliberately slow: 1 ms per loop iteration */'],
+    [80, '        uint32_t sr = USART2->SR;   /* one snapshot; ORE clears on SR read then DR read */'],
+    [82, '        if ((sr & USART_SR_ORE) != 0u) {'], [83, '            g_overruns++;'], [84, '        }'],
+    [86, '        if ((sr & USART_SR_RXNE) != 0u) {'],
+    [87, '            uint8_t byte = (uint8_t)USART2->DR;'],
+    [89, '            uart_write_char((char)byte);'],
+    [90, '            if ((sr & USART_SR_ORE) != 0u) {'],
+    [91, "                uart_write_char('!');   /* the lost bytes came right after this one */"],
+    [92, '            }'],
+    [93, '        } else if ((sr & USART_SR_ORE) != 0u) {'],
+    [96, '            (void)USART2->DR;'],
+    [97, "            uart_write_char('!');"], [98, '        }'], [99, '    }'], [100, '}']
+  ];
+
+  var B = { RXNE: 0, ORE: 0, RDR: '—', lost: 0, terminal: '(nothing)', look: 'sleeping', sr: '—' };
+  function base(o) { var r = {}, k; for (k in B) r[k] = B[k]; for (k in o) r[k] = o[k]; return r; }
+
+  var SCEN = [
+    { id: 'slow', tab: '115200.seq', init: base({}), steps: [
+      { f: 'main', t: 'main', label: 'delay_ms(1)', title: 'The loop sleeps for 1 ms', desc: 'It does not look at the USART. One byte takes 86.9 µs, so eleven bytes fit inside this sleep.', code: 'delay_ms(1u);', lines: [78], set: { look: 'sleeping' } },
+      { f: 'line', t: 'usart', label: "'t' arrives", title: 'First byte lands in RDR', desc: 'The shift register fills, copies the byte into RDR, and sets RXNE.', code: '/* hardware */', lines: [], set: { RXNE: 1, RDR: "'t'" } },
+      { f: 'usart', t: 'usart', label: '2nd byte: ORE', kind: 'bad', title: 'The next byte cannot land', desc: 'RXNE is still 1, so RDR is not updated. The shift register is overwritten and ORE is set (RM0390 p. 784).', code: '/* hardware */  ORE = 1', lines: [], set: { ORE: 1, lost: 1 } },
+      { f: 'usart', t: 'usart', label: '9 more bytes lost', kind: 'bad', title: 'The rest of the burst', desc: 'Bytes 3 to 11 arrive before the loop wakes. Every one is lost; ORE stays set.', code: '/* hardware */', lines: [], set: { lost: 10 } },
+      { f: 'main', t: 'main', label: 'sr = USART2->SR', title: 'One snapshot of the status', desc: 'At 1 ms the loop reads SR once. RXNE = 1 and ORE = 1, so sr = 0x28.', code: 'uint32_t sr = USART2->SR;', lines: [80], set: { look: 'awake', sr: '0x28' } },
+      { f: 'main', t: 'usart', label: 'byte = DR', title: 'Take the byte that survived', desc: 'RDR still holds the first byte, "t". The read clears RXNE and completes the ORE clear sequence.', code: 'uint8_t byte = (uint8_t)USART2->DR;', lines: [87], set: { RXNE: 0, ORE: 0, RDR: '—' } },
+      { f: 'main', t: 'term', label: "echo 't'", title: 'Send it back', desc: 'uart_write_char waits for TXE, then writes DR.', code: 'uart_write_char((char)byte);', lines: [89], set: { terminal: 't' } },
+      { f: 'main', t: 'term', label: "ORE set: '!'", kind: 'bad', title: 'Mark the hole', desc: 'Because the snapshot had ORE set, one "!" follows the byte. The program cannot say how many bytes went missing.', code: "if ((sr & USART_SR_ORE) != 0u) {\n  uart_write_char('!');", lines: [90, 91], set: { terminal: 't!' } },
+      { f: 'main', t: 'main', label: 'next look', kind: 'bad', title: 'And again, one millisecond later', desc: 'The second batch of 8 bytes loses 7. In total 19 were sent, 2 echoed, 17 lost.', code: '/* loop */  delay_ms(1u);', lines: [78], set: { terminal: 't!r!', lost: 17 }, verdict: 'bad', verdictText: '19 bytes pasted, 2 echoed, 17 dropped. The terminal shows "t!r!".' }
+    ] },
+    { id: 'slow9600', tab: '9600.seq', init: base({}), steps: [
+      { f: 'main', t: 'main', label: 'delay_ms(1)', title: 'The same 1 ms sleep', desc: 'Nothing changes in the code. Only BRR changed: at 9600 a byte takes 1 041.9 µs.', code: 'delay_ms(1u);', lines: [78], set: { look: 'sleeping' } },
+      { f: 'main', t: 'main', label: 'wakes: sr = 0x00', title: 'First look finds nothing', desc: 'The byte is still on the wire. The loop simply goes back to sleep.', code: 'uint32_t sr = USART2->SR;', lines: [80], set: { look: 'awake', sr: '0x00' } },
+      { f: 'line', t: 'usart', label: "'t' arrives", title: 'One byte, one look later', desc: 'At 9600 the byte time is longer than the sleep, so RXNE is never still set when the next byte lands.', code: '/* hardware */', lines: [], set: { RXNE: 1, RDR: "'t'" } },
+      { f: 'main', t: 'main', label: 'sr = 0x20', title: 'Only RXNE, no ORE', desc: 'The loop reads the status and sees one byte waiting.', code: 'uint32_t sr = USART2->SR;', lines: [80], set: { sr: '0x20' } },
+      { f: 'main', t: 'usart', label: 'byte = DR', title: 'Take it', desc: 'RXNE clears. There was no overrun, so no "!" will follow.', code: 'uint8_t byte = (uint8_t)USART2->DR;', lines: [87], set: { RXNE: 0, ORE: 0, RDR: '—' } },
+      { f: 'main', t: 'term', label: "echo 't'", title: 'Send it back', desc: 'The echo path is the same; only the timing changed.', code: 'uart_write_char((char)byte);', lines: [89], set: { terminal: 't' } },
+      { f: 'main', t: 'main', label: 'next byte', kind: 'good', title: 'Nineteen looks, nineteen bytes', desc: 'At this rate every byte gets its own look. The same code loses nothing, but it is still capped at 1 000 bytes/s.', code: '/* loop */', lines: [78], set: { terminal: 'the quick brown fox' }, verdict: 'good', verdictText: 'No overrun at 9600. The loop looks once per millisecond and a byte takes 1 041.9 µs, so each look finds exactly one byte.' }
+    ] },
+    { id: 'stuck', tab: 'ore_never_cleared.seq', bug: true, dim: [96],
+      sheetNote: 'This tab removes line 96, the DR read that finishes the ORE clear sequence. The real code has it.',
+      init: base({}), steps: [
+      { f: 'main', t: 'usart', label: 'DR read #47', title: 'The last good byte is taken', desc: 'RXNE clears on this read. Everything looks normal.', code: 'uint8_t byte = (uint8_t)USART2->DR;', lines: [87], set: { RXNE: 0 } },
+      { f: 'line', t: 'usart', label: 'a byte lands now', kind: 'bad', title: 'The next byte completes too early', desc: 'RDR is not updated because the read is still finishing. The byte is lost and ORE is set (RM0390 p. 784).', code: '/* hardware */  ORE = 1', lines: [], set: { ORE: 1, lost: 1 } },
+      { f: 'main', t: 'main', label: 'sr = USART2->SR', title: 'The loop sees ORE only', desc: 'RXNE is 0, ORE is 1, so sr = 0x08.', code: 'uint32_t sr = USART2->SR;', lines: [80], set: { sr: '0x08', look: 'awake' } },
+      { f: 'main', t: 'main', label: 'RXNE = 0: skip', title: 'The first branch is skipped', desc: 'There is no byte to read, so the echo branch does not run.', code: 'if ((sr & USART_SR_RXNE) != 0u) { ... }', lines: [86] },
+      { f: 'main', t: 'term', label: "print '!'", kind: 'bad', title: 'Handled, but not cleared', desc: 'With line 96 removed, DR is never read, so the clear sequence never finishes. ORE stays 1.', code: "} else if ((sr & USART_SR_ORE) != 0u) {\n  uart_write_char('!');", lines: [93, 97], set: { terminal: '!' } },
+      { f: 'main', t: 'main', label: 'next loop', kind: 'bad', title: 'The flag is still there', desc: 'No new byte arrived, yet SR still reports ORE. The loop prints another "!".', code: '/* loop */', lines: [78], set: { terminal: '!!' } },
+      { f: 'main', t: 'term', label: '… forever', kind: 'bad', title: 'A stream of marks with no data', desc: 'Only a later RXNE read of DR can clear ORE. Until then every millisecond prints one more "!".', code: '/* repeat */', lines: [93, 97], set: { terminal: '!!!!' }, verdict: 'bad', verdictText: 'ORE is stuck set. The terminal fills with "!" while the line is idle.' }
+    ] }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'programs/uart_echo_poll.c', key: 'uartPollSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'line', t: 'PA3 line', s: 'one byte / 86.9 µs' },
+      { id: 'usart', t: 'USART2', s: 'RDR · SR · shift' },
+      { id: 'main', t: 'main', s: 'for (;;) + delay' },
+      { id: 'term', t: 'Terminal', s: 'echo output' }
+    ]
+  });
+})();
+
+/* ---------- byte-time helpers (BRR is fCK/baud rounded, RM0390 p. 788) ---------- */
+function baudInfo(baud) {
+  var brr = Math.floor((16000000 + baud / 2) / baud);
+  var actual = 16000000 / brr;
+  return { brr: brr, actual: actual, err: (actual - baud) / baud * 100, t: 10 / actual * 1e6, Bps: actual / 10 };
+}
+
+/* ---------- timeline lab ---------- */
+(function () {
+  var TEXT = 'the quick brown fox';       /* 19 bytes: sample data */
+  var N = TEXT.length;
+  var BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800];
+  var LO = 50, HI = 5000;                 /* µs, log slider */
+  var sel = $('baud'), sl = $('pd');
+
+  BAUDS.forEach(function (b) {
+    var o = document.createElement('option'); o.value = b; o.textContent = fmt(b); sel.appendChild(o);
+  });
+  sel.value = '115200';
+
+  function pFromSlider(v) { return Math.round(LO * Math.pow(HI / LO, v / 100)); }
+  function sliderFromP(p) { return Math.round(Math.log(p / LO) / Math.log(HI / LO) * 100); }
+
+  function run() {
+    var baud = +sel.value, info = baudInfo(baud);
+    var T = info.t, P = pFromSlider(+sl.value);
+    var state = new Array(N), echo = '', kept = 0, lost = 0, ores = 0, looks = [];
+    var i = 0;
+    for (var m = 1; m <= 4000; m++) {
+      var t = m * P;
+      if (t > N * T + P) break;
+      var c = 0;
+      while (i < N && (i + 1) * T <= t) { c++; i++; }
+      if (c > 0) {
+        var first = i - c;
+        state[first] = 'kept'; kept++;
+        echo += TEXT.charAt(first);
+        for (var k = first + 1; k < i; k++) state[k] = 'lost';
+        lost += c - 1;
+        if (c > 1) { ores++; echo += '<span class="tl-mark">!</span>'; }
+        looks.push({ idx: t / T, batch: c });
+      }
+    }
+    for (var j = 0; j < N; j++) if (!state[j]) { state[j] = 'lost'; lost++; }
+    return { T: T, P: P, state: state, echo: echo, kept: kept, lost: lost, ores: ores, looks: looks, info: info };
+  }
+
+  function render() {
+    var r = run(), T = r.T, P = r.P;
+    $('pval').innerHTML = fmt(P) + '<small>µs between looks</small>';
+
+    $('brow').innerHTML = r.state.map(function (s, i) {
+      return '<div class="bcell ' + s + '" title="byte ' + (i + 1) + '">' + TEXT.charAt(i) + '</div>';
+    }).join('');
+
+    $('lmarks').innerHTML = r.looks.slice(0, 26).map(function (l, i) {
+      var left = Math.min(99.5, l.idx / N * 100);
+      return '<i style="left:' + left + '%" title="look ' + (i + 1) + '"></i>' +
+        (i === 0 ? '<b style="left:' + Math.min(88, left) + '%">look</b>' : '');
+    }).join('');
+
+    $('term').innerHTML =
+      '<div><span class="tl-lab">sent   </span><span class="tl-out">' + TEXT + '</span></div>' +
+      '<div><span class="tl-lab">echoed </span><span class="tl-out">' + r.echo + '</span></div>';
+
+    var perLook = P / T;
+    $('chips').innerHTML =
+      '<span class="chip">byte time ' + T.toFixed(1) + ' µs</span>' +
+      '<span class="chip">' + perLook.toFixed(2) + ' bytes per look</span>' +
+      '<span class="chip ' + (r.lost ? 'bad' : 'ok') + '">kept ' + r.kept + ' / ' + N + '</span>' +
+      '<span class="chip ' + (r.lost ? 'bad' : '') + '">lost ' + r.lost + '</span>' +
+      '<span class="chip ' + (r.ores ? 'bad' : 'ok') + '">overruns ' + r.ores + '</span>';
+
+    $('pverdict').className = 'verdict-line ' + (r.lost ? 'bad' : 'ok');
+    $('pverdict').innerHTML = r.lost
+      ? '<b>The look is ' + perLook.toFixed(1) + '× the byte time.</b> Up to ' + Math.ceil(perLook) + ' bytes can arrive between looks, so ' + r.lost + ' of ' + N + ' are dropped. One <code>!</code> is printed per batch.'
+      : '<b>Safe here: the look (' + P + ' µs) is shorter than one byte (' + T.toFixed(1) + ' µs).</b> Every byte arrives between two looks, so nothing queues behind RXNE.';
+
+    $('phint').textContent = 'Sample data: "' + TEXT + '" sent back to back at ' + fmt(+sel.value) + ' baud. Model: byte times are exact multiples of ' + T.toFixed(1) +
+      ' µs from t = 0, reads are instantaneous, and the phase between the first byte and the first look is ignored. The real UART also spends a start edge on each frame, and the loop body adds a few µs on top of the delay.';
+  }
+
+  sel.addEventListener('change', render);
+  sl.addEventListener('input', render);
+  $('pcode').onclick = function () { sel.value = '115200'; sl.value = sliderFromP(1000); render(); };
+  sl.value = sliderFromP(1000);
+  render();
+})();
+
+/* ---------- baud / BRR calculator ---------- */
+(function () {
+  var hex = function (v, w) { return '0x' + v.toString(16).toUpperCase().padStart(w, '0'); };
+  function render() {
+    var baud = Math.max(1200, Math.min(3000000, parseInt($('baud2').value, 10) || 115200));
+    var i = baudInfo(baud);
+    $('brrout').innerHTML = hex(i.brr, 4) + ' <small>USART2-&gt;BRR</small>';
+    $('kv-brr').innerHTML = [
+      ['USARTDIV', (i.brr / 16).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')],
+      ['Actual baud', fmt(Math.round(i.actual))],
+      ['Error', (i.err >= 0 ? '+' : '') + i.err.toFixed(2) + ' %'],
+      ['One byte (10 bits)', i.t.toFixed(1) + ' µs'],
+      ['Link ceiling', fmt(Math.round(i.Bps)) + ' B/s']
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+    $('brrwarn').className = 'warnbox' + (Math.abs(i.err) > 2 ? ' show' : '');
+  }
+  $('baud2').addEventListener('input', render);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-b]'), function (b) {
+    b.onclick = function () { $('baud2').value = b.dataset.b; render(); };
+  });
+  render();
+})();
+
+/* ---------- loop ceiling calculator ---------- */
+(function () {
+  function render() {
+    var p = Math.max(10, Math.min(100000, parseInt($('pk').value, 10) || 1000));
+    var rate = 1e6 / p;
+    $('capout').innerHTML = fmt(Math.round(rate)) + ' <small>bytes / second</small>';
+    $('kv-cap').innerHTML = [
+      ['Look period', fmt(p) + ' µs'],
+      ['Looks per second', fmt(Math.round(rate))],
+      ['Link at 115200', '11 511 B/s'],
+      ['One byte at 115200', '86.9 µs']
+    ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
+  }
+  $('pk').addEventListener('input', render);
+  render();
+})();
+</script>
+</body>
+</html>
