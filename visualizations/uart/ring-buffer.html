@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UART ring buffer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+/* ring-buffer specific; tokens, nav, window, buttons, labs live in ../shared/style.css */
+.who-p { color: var(--ember); font-weight: 500; } .who-m { color: var(--ink); font-weight: 500; }
+.spd { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-3); margin-left: auto; }
+.spd input { width: 110px; }
+.modenote { padding: 8px 14px; font-size: 12px; color: var(--ink-2); border-bottom: 1px solid var(--line-2); background: color-mix(in srgb, var(--ember) 5%, var(--card)); }
+.modenote b { color: var(--ink); font-weight: 500; }
+.sim { display: grid; grid-template-columns: minmax(0, 1fr) 7px var(--side, 400px); }
+.sim .l { padding: 14px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.sim .r { padding: 14px; min-width: 0; display: flex; flex-direction: column; gap: 12px; background: var(--card); }
+.io { display: grid; gap: 8px; }
+.io-row { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; }
+.io-row .io-lab { font-size: 12px; color: var(--ink-3); }
+.typebox { font: 500 15px "JetBrains Mono", monospace; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); min-height: 38px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; cursor: text; }
+.typebox:focus-within { border-color: var(--ember); }
+.typebox input { flex: 1; min-width: 130px; border: 0; outline: 0; background: transparent; font: inherit; color: inherit; padding: 0; }
+.typebox input:focus-visible { outline: 0; }
+.ch { display: inline-block; min-width: .7em; text-align: center; border-bottom: 2px solid transparent; line-height: 1.25; }
+.ch.flight { color: var(--ink-3); border-bottom-color: var(--line); }
+.ch.ring { color: var(--ember); border-bottom-color: var(--ember); }
+.ch.echoed { color: var(--ink); border-bottom: 3px double var(--ink); }
+.ch.dropped { color: var(--bad); text-decoration: line-through; border-bottom-color: var(--bad); }
+.echo { font: 500 15px "JetBrains Mono", monospace; min-height: 38px; padding: 7px 10px; border: 1px dashed var(--line); border-radius: 4px; overflow-wrap: anywhere; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--ink-3); }
+.legend .ch { min-width: 0; font: 500 12px "JetBrains Mono", monospace; margin-right: 5px; }
+svg.ring { width: 100%; height: auto; max-width: 420px; margin: 0 auto; display: block; }
+.slot { fill: var(--card); stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 4 4; transition: fill .25s, stroke .25s; }
+.slot.staged { fill: color-mix(in srgb, var(--ember) 13%, var(--card)); stroke: var(--ember); stroke-dasharray: 3 3; }
+.slot.full { fill: color-mix(in srgb, var(--ink) 8%, var(--card)); stroke: var(--ink); stroke-dasharray: none; }
+.slot.hot { stroke-width: 3; }
+.slot-n { font: 400 11px "JetBrains Mono", monospace; fill: var(--ink-3); text-anchor: middle; }
+.slot-c { font: 500 26px "JetBrains Mono", monospace; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.ptr { transition: transform .55s cubic-bezier(.3,.8,.25,1); }
+.ptr.head { fill: var(--ember); } .ptr.tail { fill: var(--ink); }
+.plab { font: 500 13px "JetBrains Mono", monospace; text-anchor: middle; dominant-baseline: central; transition: transform .55s cubic-bezier(.3,.8,.25,1); }
+.plab.head { fill: var(--ember); } .plab.tail { fill: var(--ink); }
+.ctr-n { font: 400 40px "Inter", sans-serif; letter-spacing: -.03em; fill: var(--ink); text-anchor: middle; }
+.ctr-t { font: 400 12px "Inter", sans-serif; fill: var(--ink-3); text-anchor: middle; }
+.readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.readout div { border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; font-size: 11px; color: var(--ink-3); }
+.readout b { display: block; font: 500 17px "JetBrains Mono", monospace; color: var(--ink); overflow-wrap: anywhere; }
+.readout .h b { color: var(--ember); } .readout .d b { color: var(--bad); }
+.caption { border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; padding: 10px 12px; min-height: 96px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.caption.isr { border-left-color: var(--ember); } .caption.main { border-left-color: var(--ink); } .caption.drop { border-left-color: var(--bad); }
+.caption .who { display: block; font: 500 11px "JetBrains Mono", monospace; margin-bottom: 4px; color: var(--ink-3); }
+.caption.isr .who { color: var(--ember); } .caption.main .who { color: var(--ink); } .caption.drop .who { color: var(--bad); }
+.caption code { font-size: 11.5px; } .caption b { color: var(--ink); font-weight: 500; }
+.sheet { display: flex; }
+.nocode .sheet, .nocode .codenote { display: none; }
+.sheet-body.code { max-height: 460px; }
+.ln.on-prod { background: color-mix(in srgb, var(--ember) 14%, transparent); border-left-color: var(--ember); }
+.ln.on-cons { background: color-mix(in srgb, var(--ink) 9%, transparent); border-left-color: var(--ink); }
+.ln.on-warn { background: color-mix(in srgb, var(--bad) 12%, transparent); border-left-color: var(--bad); }
+.ln[class*="on-"] span, .ln[class*="on-"] i { color: var(--ink); }
+.codenote { font-size: 11.5px; color: var(--ink-3); margin: 0; }
+.tapebox { border-top: 1px solid var(--line-2); padding: 12px 14px 14px; }
+.tapebox h3 { margin: 0 0 2px; font: 500 13px "Inter", sans-serif; }
+.tape-note { font-size: 12px; color: var(--ink-3); margin: 0 0 8px; }
+.tape-wrap { overflow-x: auto; padding-bottom: 4px; }
+.tape { display: flex; gap: 4px; min-width: max-content; }
+.cell { width: 80px; border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px 5px; text-align: center; background: var(--card); }
+.cell.in { background: color-mix(in srgb, var(--ink) 7%, var(--card)); border-color: var(--ink); }
+.cell .cn { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.cell .cc { font: 500 17px "JetBrains Mono", monospace; height: 26px; }
+.cell .cs { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-2); }
+.cell .mk { height: 16px; font: 500 11px "JetBrains Mono", monospace; }
+.cell .mk .h { color: var(--ember); } .cell .mk .t { color: var(--ink); }
+.facts .card h3 { margin: 0 0 6px; font: 500 14px "JetBrains Mono", monospace; display: block; }
+.facts .p h3 { color: var(--ember); }
+.sl { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.sl label { font-size: 12px; color: var(--ink-3); }
+.sl input[type=range] { flex: 1; min-width: 180px; }
+.sl output { font: 500 24px "JetBrains Mono", monospace; min-width: 3ch; letter-spacing: -.02em; }
+.mbits { display: grid; grid-template-columns: 96px repeat(6, 40px); gap: 3px; align-items: center; }
+.mbits .rl { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.mb { height: 38px; display: grid; place-items: center; border-radius: 4px; font: 500 16px "JetBrains Mono", monospace; border: 1px solid var(--line); background: var(--card); }
+.mb.hi { color: var(--ink-3); border-style: dashed; opacity: .55; }
+.mb.lo { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, var(--card)); }
+.eqn { font: 500 14px "JetBrains Mono", monospace; overflow-wrap: anywhere; }
+.eqn em { font-style: normal; color: var(--ember); }
+.track { display: flex; gap: 4px; flex-wrap: wrap; }
+.track span { width: 38px; height: 38px; border-radius: 4px; border: 1px dashed var(--line); display: grid; place-items: center; font: 400 13px "JetBrains Mono", monospace; color: var(--ink-3); }
+.track span.me { border: 1px solid var(--ember); background: color-mix(in srgb, var(--ember) 12%, var(--card)); color: var(--ember); font-weight: 500; }
+.sizes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--ink-3); }
+.wraptable { overflow-x: auto; }
+.wt { border-collapse: separate; border-spacing: 3px; font: 400 12px "JetBrains Mono", monospace; min-width: max-content; }
+.wt th { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); text-align: left; padding: 0 12px 0 0; white-space: nowrap; letter-spacing: 0; text-transform: none; }
+.wt td { min-width: 90px; text-align: center; padding: 6px 8px; border-radius: 4px; background: var(--card); border: 1px solid var(--line); }
+.wt td.c { color: var(--ink-3); border-color: var(--line-2); }
+.wt td.bad { background: color-mix(in srgb, var(--bad) 10%, var(--card)); border-color: var(--bad); color: var(--bad); font-weight: 500; }
+.wt td.good { border-color: color-mix(in srgb, var(--ink) 55%, transparent); }
+@media (max-width: 900px) { .sim { grid-template-columns: 1fr; } .io-row { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width: 520px) { .readout { grid-template-columns: repeat(2, 1fr); } .mbits { grid-template-columns: 72px repeat(6, 1fr); } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">uart_echo_irq <span>ring buffer</span></a>
+    <a class="l" href="#sim">Simulate</a>
+    <a class="l" href="#why-two">Two counters</a>
+    <a class="l" href="#mask">Mask</a>
+    <a class="l" href="#pow2">Power of two</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/uart_echo_irq.c</div>
+    <h1 style="margin-top:14px">The interrupt writes. main reads. <em>Two counters keep them apart.</em></h1>
+    <p class="serif">Each received byte triggers the <span class="who-p">interrupt handler</span>. It drops the byte into a ring of slots. <span class="who-m">main</span> collects bytes later, at its own pace. This page uses 8 slots so you can see every one. The real program uses 64.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sim">Type a letter →</a>
+      <a class="btn" href="#pow2">Why a power of two</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Peripheral</span><b>USART2 · IRQ 38</b></div>
+    <div><span>RX / TX</span><b>PA3 / PA2 · AF7</b></div>
+    <div><span>Baud · time per byte</span><b>115200 · 86.8 µs</b></div>
+    <div><span>head written by</span><b>ISR only</b></div>
+    <div><span>tail written by</span><b>main only</b></div>
+    <div><span>Ring (real / page)</span><b>64 / 8 slots</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>Byte arrives</b><span>PA3, stop bit ends</span></div>
+  <div class="s hw"><i>HW 2</i><b>RXNE = 1</b><span>USART2 raises IRQ 38</span></div>
+  <div class="s"><i>CODE 3</i><b>ISR: rb_push</b><span>store byte, then head + 1</span></div>
+  <div class="s"><i>CODE 4</i><b>Ring</b><span>slots between tail and head</span></div>
+  <div class="s"><i>CODE 5</i><b>main: rb_pop</b><span>read byte, then tail + 1</span></div>
+  <div class="s hw"><i>HW 6</i><b>Echo</b><span>byte goes out on PA2</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<!-- SIMULATION -->
+<section id="sim">
+  <div class="sh"><div class="eyebrow">01 · simulate</div><h2>Type a letter and follow the interrupt</h2>
+    <p>Each key is one byte arriving on PA3. By default main pops each byte right after the handler stores it, as on the real chip. Switch to <b>Busy main</b> to see the ring fill.</p></div>
+
+  <div class="win" id="win">
+    <div class="top"><div class="dots"><i></i><i></i><i></i></div><div class="tab" aria-selected="true">ring_simulation</div>
+      <button class="sheet-tg first" id="codeTg" aria-pressed="true" title="Show or hide the source">{ } Code</button></div>
+
+    <div class="toolbar">
+      <span class="seg" id="mode" role="group" aria-label="How fast main is">
+        <button type="button" data-m="real" aria-pressed="true">Realistic main</button>
+        <button type="button" data-m="busy" aria-pressed="false">Busy main</button>
+      </span>
+      <button class="btn sm prod" id="btnTen" type="button">Send 10 bytes</button>
+      <button class="btn sm dark" id="btnOne" type="button">Main reads one</button>
+      <button class="btn sm ghost" id="btnAll" type="button">Main reads all</button>
+      <button class="btn sm ghost" id="btnStep" type="button">Next step</button>
+      <button class="btn sm ghost tgl" id="btnPlay" type="button" aria-pressed="true">Playing</button>
+      <button class="btn sm ghost" id="btnWrap" type="button" title="Only while the ring is empty">Counters at 2³² − 3</button>
+      <button class="btn sm ghost" id="btnReset" type="button">Reset</button>
+      <label class="spd">Step delay <input id="speed" type="range" min="150" max="1500" step="50" value="800" aria-label="Step delay in milliseconds"><span id="speedv" class="mono">800 ms</span></label>
+    </div>
+
+    <div class="modenote" id="modenote"></div>
+
+    <div class="sim" id="simgrid">
+      <div class="l">
+        <div class="io">
+          <div class="io-row"><label class="io-lab" for="typein">You type</label>
+            <div class="typebox" id="typebox"><span id="typed"></span><input id="typein" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Click here and type" aria-label="Type characters to send to the board"></div></div>
+          <div class="io-row"><span class="io-lab">Board echoes</span><div class="echo" id="echo" aria-live="off"></div></div>
+        </div>
+        <div class="legend" aria-label="Legend for typed characters">
+          <span><span class="ch flight">a</span>on the wire</span>
+          <span><span class="ch ring">a</span>waiting in the ring</span>
+          <span><span class="ch echoed">a</span>echoed by main</span>
+          <span><span class="ch dropped">a</span>dropped, ring full</span>
+        </div>
+        <svg class="ring" id="ring" viewBox="0 0 480 480" role="img" aria-label="Ring of 8 slots with head and tail pointers"></svg>
+        <div class="readout">
+          <div class="h"><span>head</span><b id="rHead">0</b><span id="rHeadS">slot 0</span></div>
+          <div><span>tail</span><b id="rTail">0</b><span id="rTailS">slot 0</span></div>
+          <div><span>head − tail</span><b id="rCount">0</b><span>bytes waiting</span></div>
+          <div class="d"><span>dropped</span><b id="rDrops">0</b><span>ring was full</span></div>
+        </div>
+      </div>
+      <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="Resize simulation and code" tabindex="0" title="Drag to resize · double-click to reset"></div>
+      <div class="r">
+        <div class="caption" id="caption" aria-live="polite"><span class="who">Idle</span>Nothing is running. Click the box and type a letter. Each key is one byte arriving on PA3.</div>
+        <div class="sheet">
+          <div class="sheet-h"><b>uart_echo_irq.c</b><span>lit = running now</span></div>
+          <div class="sheet-body code" id="code" tabindex="0" aria-label="Source code of uart_echo_irq.c with the running line highlighted"></div>
+        </div>
+        <p class="codenote">Real line numbers. Here <code>RING_SIZE</code> is 8 and <code>RING_MASK</code> is 7. The simulation runs one thing at a time. On the chip the handler can cut into main between any two instructions, so the order of the writes matters.</p>
+      </div>
+    </div>
+
+    <div class="tapebox">
+      <h3>The same counters in a line</h3>
+      <p class="tape-note">Counters never go back to 0. The ring is this line folded every 8 cells. Dark cells hold bytes main has not read.</p>
+      <div class="tape-wrap"><div class="tape" id="tape"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="why-two">
+  <div class="sh"><div class="eyebrow">02 · ownership</div><h2>Why there are two counters</h2>
+    <p>The handler can run in the middle of main, so each side gets one counter that only it changes.</p></div>
+  <div class="facts">
+    <div class="card p"><h3>head</h3><ul><li>The next slot to write.</li><li>Only the interrupt handler changes it.</li><li>main reads it to see if the ring is empty.</li></ul></div>
+    <div class="card"><h3>tail</h3><ul><li>The next slot to read.</li><li>Only main changes it.</li><li>The handler reads it to see if the ring is full.</li></ul></div>
+  </div>
+  <div class="three">
+    <div class="card"><b>One writer, no lock</b>If both sides wrote one variable, an interrupt between main's read and write would erase an update.</div>
+    <div class="card"><b>A stale read is safe</b>If main sees an old head, it thinks fewer bytes wait and picks the rest up next pass.</div>
+    <div class="card"><b>head − tail is the fill level</b>0 is empty, 8 is full. One position could not tell the two apart. Counters that keep counting can.</div>
+  </div>
+</section>
+
+<section id="mask">
+  <div class="sh"><div class="eyebrow">03 · the mask</div><h2>Why head &amp; 7 finds the slot</h2>
+    <p>The counter keeps counting, the ring has 8 slots. The slot is the remainder after dividing by 8: the lowest 3 bits. The higher bits count laps. AND with 7 (<code>0b111</code>) keeps the low 3 bits. Drag the slider.</p></div>
+  <div class="win"><div class="lab">
+    <div class="sl"><label for="nslide">Counter value</label><input id="nslide" type="range" min="0" max="63" value="27"><output id="nout" for="nslide">27</output></div>
+    <div class="mbits" id="bits"></div>
+    <div class="eqn" id="eq"></div>
+    <div class="track" id="track" aria-label="Which of the 8 slots the counter lands on"></div>
+  </div></div>
+</section>
+
+<section id="pow2">
+  <div class="sh"><div class="eyebrow">04 · ring size</div><h2>Why the size must be a power of two</h2>
+    <p>The mask must be all ones (<code>0b111</code>) to keep a whole group of low bits. And the 32-bit counter wraps from 4294967295 to 0, so the slots must carry on in order. That works only when 2³² is a whole number of laps: 4, 8, 16, 64. The table shows 8 counters across the wrap.</p></div>
+  <div class="win"><div class="lab">
+    <div class="sizes"><span>Ring size</span><span class="seg" id="sizes" role="group" aria-label="Ring size"></span></div>
+    <div class="wraptable"><table class="wt" id="wt"></table></div>
+    <div class="verdict" id="verdict"></div>
+  </div></div>
+</section>
+
+<footer>Source: programs/uart_echo_irq.c, lines 32–45, 48–55, 64–80 and 126–134. <code>head − tail</code> stays correct across the wrap because both counters are <code>uint32_t</code> and unsigned arithmetic wraps the same way.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const u32 = x => x >>> 0;
+const vis = c => c === " " ? "␣" : c;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- source lines (real line numbers of programs/uart_echo_irq.c) ---------- */
+const CODE = [
+  {fn:"USART2_IRQHandler: runs when a byte arrives", lines:[
+    [64,"void USART2_IRQHandler(void)"],[65,"{"],
+    [66,"    uint32_t sr = USART2->SR;"],
+    [68,"    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) == 0u) {"],
+    [69,"        return;"],[70,"    }"],
+    [72,"    uint8_t byte = (uint8_t)USART2->DR;"],
+    [74,"    if ((sr & USART_SR_ORE) != 0u) {"],
+    [75,"        g_overruns++;                      /* bytes after this one were lost */"],[76,"    }"],
+    [77,"    if ((sr & USART_SR_RXNE) != 0u) {"],
+    [78,"        rb_push(byte);"],[79,"    }"],[80,"}"]]},
+  {fn:"rb_push: the handler writes", lines:[
+    [32,"static void rb_push(uint8_t byte)"],[33,"{"],
+    [34,"    uint32_t head = g_head;"],
+    [35,"    uint32_t tail = g_tail;"],
+    [37,"    if ((head - tail) >= RING_SIZE) {     /* full */"],
+    [38,"        g_ring_drops++;"],
+    [39,"        return;"],[40,"    }"],
+    [42,"    g_rx_buf[head & RING_MASK] = byte;"],
+    [43,"    COMPILER_BARRIER();                   /* store the data before publishing it */"],
+    [44,"    g_head = head + 1u;"],[45,"}"]]},
+  {fn:"rb_pop: main reads", lines:[
+    [48,"static uint8_t rb_pop(void)"],[49,"{"],
+    [50,"    uint32_t tail = g_tail;"],
+    [51,"    uint8_t byte = g_rx_buf[tail & RING_MASK];"],
+    [52,"    COMPILER_BARRIER();                   /* read the data before freeing the slot */"],
+    [53,"    g_tail = tail + 1u;"],
+    [54,"    return byte;"],[55,"}"]]},
+  {fn:"main loop", lines:[
+    [126,"        __disable_irq();"],
+    [127,"        if (rb_empty()) {"],
+    [128,"            __WFI();"],
+    [129,"            __enable_irq();"],
+    [130,"            continue;                      /* re-check: the ring may still be empty */"],[131,"        }"],
+    [132,"        __enable_irq();"],
+    [134,"        uart_write_char((char)rb_pop());"]]}
+];
+const codeEl = $("#code");
+codeEl.innerHTML = CODE.map(b =>
+  `<div class="fn">${esc(b.fn)}</div>` +
+  b.lines.map(([n,t]) => `<div class="ln" data-l="${n}"><i>${n}</i><span>${esc(t)}</span></div>`).join("")
+).join("");
+
+/* ---------- state ---------- */
+let N = 8, MASK = 7;
+const S = {};
+let queue = [], cur = null, playing = true, timer = null;
+
+function slotDeg(acc){ return -90 + acc * (360 / N); }
+
+function reset(start = 0){
+  clearTimeout(timer); timer = null;
+  queue = []; cur = null;
+  S.head = S.tail = u32(start);
+  S.slots = Array(N).fill(null);
+  S.drops = 0;
+  S.hAcc = S.tAcc = (S.head & MASK);
+  S.typed = []; S.echo = []; S.nextId = 0;
+  S.hot = -1;
+  setCaption("Idle", "", "Nothing is running. Click the box and type a letter. Each key is one byte arriving on PA3.");
+  mark([]);
+  render(true);
+}
+
+/* ---------- operations: generators that change state one visible step at a time ---------- */
+function* isrOp(rec){
+  const ch = rec.ch;
+  yield {who:"isr", lines:[64], text:`The stop bit of <code>${esc(ch)}</code> ends. RXNE becomes 1 and the USART raises IRQ 38. The CPU stops main and enters <code>USART2_IRQHandler</code>.`};
+  yield {who:"isr", lines:[66,68], text:`<code>sr = USART2-&gt;SR</code>. RXNE is 1, so this interrupt is for us. Reading SR is the first half of the clear sequence.`};
+  yield {who:"isr", lines:[72], text:`<code>byte = USART2-&gt;DR</code> reads <code>${esc(ch)}</code> from the receive register. That read clears RXNE, so the USART can accept the next byte.`};
+  yield {who:"isr", lines:[77,78], text:`RXNE was set, so the handler calls <code>rb_push(byte)</code>.`};
+  const head = S.head, tail = S.tail;
+  yield {who:"isr", lines:[34,35], text:`<code>head = g_head</code> is ${head}. <code>tail = g_tail</code> is ${tail}. The handler owns head. It only reads tail.`};
+  const used = u32(head - tail);
+  if (used >= N){
+    yield {who:"drop", lines:[37], text:`<code>head − tail</code> is ${used}, which equals <code>RING_SIZE</code>. Every slot holds a byte main has not read. There is no room.`};
+    S.drops++; rec.status = "dropped";
+    yield {who:"drop", lines:[38,39], text:`The handler counts the drop in <code>g_ring_drops</code> and returns. <code>${esc(ch)}</code> is lost. The handler still read DR, so RXNE is clear and the USART keeps working.`};
+    yield {who:"isr", lines:[80], text:`Return from the interrupt. main continues where it stopped.`};
+    return;
+  }
+  yield {who:"isr", lines:[37], text:`<code>head − tail</code> is ${used}. That is less than ${N}, so there is a free slot.`};
+  const slot = head & MASK;
+  S.slots[slot] = {ch, rec, pub:false}; S.hot = slot;
+  yield {who:"isr", lines:[42], text:`<code>g_rx_buf[head &amp; RING_MASK] = byte</code>. ${head} &amp; ${MASK} = <b>${slot}</b>, so the byte goes into slot ${slot}. main cannot see it yet, because head has not moved.`};
+  yield {who:"isr", lines:[43], text:`Compiler barrier. The slot write must finish before the head update, or main could read an empty slot.`};
+  S.head = u32(head + 1); S.hAcc += 1; S.slots[slot].pub = true; rec.status = "ring";
+  yield {who:"isr", lines:[44], text:`<code>g_head = ${head} + 1</code> = ${S.head}. Slot ${slot} now sits between tail and head, so it belongs to main.`};
+  S.hot = -1;
+  yield {who:"isr", lines:[80], text:`Return from the interrupt. main continues where it stopped.`};
+}
+
+function* popOp(){
+  yield {who:"main", lines:[126], text:`main calls <code>__disable_irq()</code>. Nothing can interrupt the next check.`};
+  if (S.head === S.tail){
+    yield {who:"main", lines:[127,128], text:`<code>rb_empty()</code>: head ${S.head} equals tail ${S.tail}. The ring is empty, so main calls <code>__WFI()</code> and sleeps until the next byte arrives.`};
+    return;
+  }
+  yield {who:"main", lines:[127], text:`<code>rb_empty()</code>: head ${S.head} is not tail ${S.tail}. There is at least one byte.`};
+  yield {who:"main", lines:[132], text:`<code>__enable_irq()</code>. main can now be interrupted again, and goes on to read.`};
+  const tail = S.tail, slot = tail & MASK, entry = S.slots[slot];
+  yield {who:"main", lines:[50], text:`<code>tail = g_tail</code> is ${tail}. main owns tail. The handler only reads it.`};
+  S.hot = slot;
+  yield {who:"main", lines:[51], text:`<code>g_rx_buf[tail &amp; RING_MASK]</code>. ${tail} &amp; ${MASK} = <b>${slot}</b>, so main reads slot ${slot} and gets <code>${esc(entry.ch)}</code>.`};
+  yield {who:"main", lines:[52], text:`Compiler barrier. main must finish reading the slot before it gives the slot back.`};
+  S.tail = u32(tail + 1); S.tAcc += 1; S.slots[slot] = null; S.hot = -1;
+  yield {who:"main", lines:[53], text:`<code>g_tail = ${tail} + 1</code> = ${S.tail}. Slot ${slot} is free again. The handler may write into it.`};
+  S.echo.push(entry.ch); entry.rec.status = "echoed";
+  yield {who:"main", lines:[134], text:`<code>uart_write_char</code> waits for TXE, writes DR, and <code>${esc(entry.ch)}</code> goes out on PA2 to your terminal.`};
+}
+
+function* popAllOp(){
+  if (S.head === S.tail){ yield* popOp(); return; }
+  while (S.head !== S.tail) yield* popOp();
+}
+
+/* ---------- engine ---------- */
+function advance(){
+  for(;;){
+    if (!cur){
+      if (!queue.length) return false;
+      cur = queue.shift()();
+    }
+    const r = cur.next();
+    if (r.done){ cur = null; continue; }
+    const v = r.value;
+    const label = v.who === "isr" ? "ISR" : v.who === "main" ? "main" : "ISR · ring full";
+    setCaption(label, v.who, v.text);
+    mark(v.lines, v.who);
+    render();
+    return true;
+  }
+}
+function tick(){
+  timer = null;
+  if (!playing) return;
+  if (advance()) timer = setTimeout(tick, +$("#speed").value);
+}
+function kick(){ if (playing && !timer) timer = setTimeout(tick, 120); }
+function enqueue(factory){ queue.push(factory); kick(); }
+function idle(){ return !cur && !queue.length; }
+
+function setCaption(label, who, html){
+  const el = $("#caption");
+  el.className = "caption" + (who === "isr" ? " isr" : who === "main" ? " main" : who === "drop" ? " drop" : "");
+  el.innerHTML = `<span class="who">${esc(label)}</span>${html}`;
+}
+function mark(lines, who){
+  const cls = who === "isr" ? "on-prod" : who === "drop" ? "on-warn" : "on-cons";
+  codeEl.querySelectorAll(".ln").forEach(e => e.classList.remove("on-prod","on-cons","on-warn"));
+  let first = null;
+  lines.forEach(n => {
+    const e = codeEl.querySelector(`.ln[data-l="${n}"]`);
+    if (e){ e.classList.add(cls); first = first || e; }
+  });
+  if (first && codeEl.offsetParent !== null){
+    const r = first.getBoundingClientRect(), b = codeEl.getBoundingClientRect();
+    if (r.top < b.top + 30 || r.bottom > b.bottom - 30) codeEl.scrollTop += r.top - b.top - b.height / 3;
+  }
+}
+
+/* ---------- ring drawing ---------- */
+const CX = 240, CY = 240, RO = 165, RI = 98;
+const pt = (r, deg) => [CX + r * Math.cos(deg * Math.PI / 180), CY + r * Math.sin(deg * Math.PI / 180)];
+function wedge(i){
+  const c = -90 + i * (360 / N), half = (360 / N) / 2 - 2.2;
+  const [x1,y1] = pt(RO, c - half), [x2,y2] = pt(RO, c + half), [x3,y3] = pt(RI, c + half), [x4,y4] = pt(RI, c - half);
+  return `M${x1},${y1} A${RO},${RO} 0 0 1 ${x2},${y2} L${x3},${y3} A${RI},${RI} 0 0 0 ${x4},${y4} Z`;
+}
+function buildRing(){
+  let h = "";
+  for (let i = 0; i < N; i++){
+    const c = -90 + i * (360 / N);
+    const [nx,ny] = pt(RI + 14, c), [cx,cy] = pt((RO + RI) / 2 + 6, c);
+    h += `<path class="slot" id="sl${i}" d="${wedge(i)}"/>` +
+         `<text class="slot-n" x="${nx}" y="${ny + 4}">${i}</text>` +
+         `<text class="slot-c" id="sc${i}" x="${cx}" y="${cy}"></text>`;
+  }
+  h += `<text class="ctr-n" id="ctn" x="${CX}" y="${CY + 4}">0</text><text class="ctr-t" x="${CX}" y="${CY + 26}">bytes waiting</text>`;
+  h += `<g id="ph" class="ptr head"><path d="M12,0 L-8,-10 L-8,10 Z"/></g>` +
+       `<g id="pt" class="ptr tail"><path d="M12,0 L-8,-10 L-8,10 Z"/></g>` +
+       `<text class="plab head" id="lh"></text><text class="plab tail" id="lt"></text>`;
+  $("#ring").innerHTML = h;
+}
+function place(id, r, acc, extraRot, rotate){
+  const deg = slotDeg(acc), [x,y] = pt(r, deg), el = $(id);
+  el.style.transform = rotate ? `translate(${x}px,${y}px) rotate(${deg + extraRot}deg)` : `translate(${x}px,${y}px)`;
+}
+function renderRing(){
+  for (let i = 0; i < N; i++){
+    const e = S.slots[i], sl = $("#sl" + i), sc = $("#sc" + i);
+    sl.setAttribute("class", "slot" + (e ? (e.pub ? " full" : " staged") : "") + (S.hot === i ? " hot" : ""));
+    sc.textContent = e ? vis(e.ch) : "";
+  }
+  place("#ph", RO + 14, S.hAcc, 180, true);
+  place("#pt", RI - 14, S.tAcc, 0, true);
+  place("#lh", RO + 44, S.hAcc, 0, false);
+  place("#lt", RI - 48, S.tAcc, 0, false);
+  $("#lh").textContent = "head";
+  $("#lt").textContent = "tail";
+  $("#ctn").textContent = u32(S.head - S.tail);
+}
+function renderTape(){
+  const count = u32(S.head - S.tail), cells = [];
+  for (let i = 0; i < 12; i++){
+    const c = u32(S.tail + i), inRing = i < count;
+    const e = inRing ? S.slots[c & MASK] : null;
+    const isH = i === count, isT = i === 0;
+    const mk = (isT ? `<span class="t">tail</span> ` : "") + (isH ? `<span class="h">head</span>` : "");
+    cells.push(`<div class="cell${inRing ? " in" : ""}"><div class="mk">${mk}</div><div class="cn">${c}</div><div class="cc">${e ? esc(vis(e.ch)) : ""}</div><div class="cs">slot ${c & MASK}</div></div>`);
+  }
+  $("#tape").innerHTML = cells.join("");
+}
+function renderIO(){
+  $("#typed").innerHTML = S.typed.map(r => `<span class="ch ${r.status}">${esc(r.ch === " " ? " " : r.ch)}</span>`).join("");
+  $("#echo").textContent = S.echo.join("");
+  $("#typein").placeholder = S.typed.length ? "" : "Click here and type";
+}
+function render(){
+  renderRing(); renderTape(); renderIO();
+  $("#rHead").textContent = S.head; $("#rHeadS").textContent = "slot " + (S.head & MASK);
+  $("#rTail").textContent = S.tail; $("#rTailS").textContent = "slot " + (S.tail & MASK);
+  $("#rCount").textContent = u32(S.head - S.tail); $("#rDrops").textContent = S.drops;
+}
+
+/* ---------- input ---------- */
+/* Realistic main: a byte takes 10 bits / 115200 = 86.8 us to arrive. The handler needs a few us,
+   so main wakes and pops it long before the next byte. Busy main: main is stuck elsewhere. */
+let realistic = true;
+const MODE_NOTE = {
+  real: "<b>Realistic main.</b> A byte takes 87 µs at 115200 baud. The handler needs a few µs and main wakes right after, so each byte is popped before the next arrives. The ring holds at most one byte.",
+  busy: "<b>Busy main.</b> main is stuck elsewhere (a long print, a delay). Bytes pile up in the ring until main is back. Press <b>Main reads one</b> to let it catch up. This is the only case where the ring fills."
+};
+function setMode(m){
+  realistic = m === "real";
+  $("#modenote").innerHTML = MODE_NOTE[m];
+  document.querySelectorAll("#mode button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+}
+document.querySelectorAll("#mode button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
+function sendChar(ch){
+  const rec = {id: S.nextId++, ch, status:"flight"};
+  S.typed.push(rec);
+  enqueue(() => isrOp(rec));
+  if (realistic) enqueue(popOp);
+  render();
+}
+$("#typein").addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length === 1){ e.preventDefault(); sendChar(e.key); }
+});
+$("#typebox").addEventListener("click", () => $("#typein").focus());
+$("#btnTen").addEventListener("click", () => { for (const ch of "abcdefghij") sendChar(ch); });
+$("#btnOne").addEventListener("click", () => enqueue(popOp));
+$("#btnAll").addEventListener("click", () => enqueue(popAllOp));
+$("#btnStep").addEventListener("click", () => {
+  if (!advance()) setCaption("Idle", "", "Nothing is waiting to run. Type a letter, or press Main reads one.");
+});
+$("#btnPlay").addEventListener("click", e => {
+  playing = !playing;
+  e.currentTarget.setAttribute("aria-pressed", String(playing));
+  e.currentTarget.textContent = playing ? "Playing" : "Paused";
+  if (playing) kick(); else { clearTimeout(timer); timer = null; }
+});
+$("#btnWrap").addEventListener("click", () => {
+  if (!idle() || S.head !== S.tail){
+    setCaption("Not now", "", "Wait until every step has run and the ring is empty. Then the counters can start near the top of their range.");
+    return;
+  }
+  const typed = S.typed, echo = S.echo, drops = S.drops;
+  reset(4294967293);
+  S.typed = typed; S.echo = echo; S.drops = drops;
+  setCaption("Counters moved", "", "Head and tail now read 4294967293, three below 2³². Send 4 or more bytes to watch them wrap to 0. Slots keep their order, and <code>head − tail</code> stays correct.");
+  render();
+});
+$("#btnReset").addEventListener("click", () => { reset(0); $("#typein").value = ""; });
+$("#speed").addEventListener("input", e => { $("#speedv").textContent = e.target.value + " ms"; });
+
+/* ---------- code toggle and draggable divider (shared/split.js) ---------- */
+(() => {
+  const win = $("#win"), tg = $("#codeTg");
+  tg.addEventListener("click", () => {
+    const on = tg.getAttribute("aria-pressed") !== "true";
+    tg.setAttribute("aria-pressed", String(on));
+    win.classList.toggle("nocode", !on);
+  });
+  Split.init({ grid: $("#simgrid"), handle: $("#rz"), key: "ringSide", def: 400, min: 300, rest: 380 });
+})();
+
+/* ---------- mask explainer ---------- */
+function renderMask(){
+  const n = +$("#nslide").value;
+  $("#nout").textContent = n;
+  let row1 = `<span class="rl">counter</span>`, row2 = `<span class="rl">mask (7)</span>`, row3 = `<span class="rl">counter &amp; 7</span>`;
+  const heads = `<span class="rl"></span>` + [5,4,3,2,1,0].map(i => `<span class="rl" style="text-align:center">${i < 3 ? "slot" : "laps"}</span>`).join("");
+  for (let i = 5; i >= 0; i--){
+    const bit = (n >> i) & 1, m = i < 3 ? 1 : 0, r = bit & m, lo = i < 3;
+    row1 += `<span class="mb ${lo ? "lo" : "hi"}">${bit}</span>`;
+    row2 += `<span class="mb ${lo ? "lo" : "hi"}">${m}</span>`;
+    row3 += `<span class="mb ${lo ? "lo" : "hi"}">${r}</span>`;
+  }
+  $("#bits").innerHTML = heads + row1 + row2 + row3;
+  const laps = n >> 3, slot = n & 7;
+  $("#eq").innerHTML = `${n} &amp; 7 = <em>${slot}</em> &nbsp;·&nbsp; ${n} = ${laps} × 8 + <em>${slot}</em> &nbsp;·&nbsp; lap ${laps}, slot ${slot}`;
+  $("#track").innerHTML = Array.from({length:8}, (_, i) => `<span class="${i === slot ? "me" : ""}">${i}</span>`).join("");
+}
+$("#nslide").addEventListener("input", renderMask);
+
+/* ---------- power of two explainer ---------- */
+const SIZES = [4, 6, 8, 10, 16];
+let wsize = 8;
+function buildSizes(){
+  const box = $("#sizes");
+  box.insertAdjacentHTML("beforeend", SIZES.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === wsize}">${s} slots</button>`).join(""));
+  box.addEventListener("click", e => {
+    const b = e.target.closest("button[data-s]"); if (!b) return;
+    wsize = +b.dataset.s;
+    box.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.s === wsize)));
+    renderWrap();
+  });
+}
+function renderWrap(){
+  const n = wsize, mask = n - 1, start = 4294967292, cs = Array.from({length:8}, (_, i) => u32(start + i));
+  const andRow = cs.map(c => c & mask), modRow = cs.map(c => c % n);
+  const pow2 = (n & (n - 1)) === 0;
+  const badAnd = andRow.map((v, i) => i > 0 && v !== (andRow[i-1] + 1) % n);
+  const badMod = modRow.map((v, i) => i > 0 && v !== (modRow[i-1] + 1) % n);
+  const cell = (v, bad) => `<td class="${bad ? "bad" : "good"}">${v}</td>`;
+  $("#wt").innerHTML =
+    `<tr><th>counter</th>${cs.map(c => `<td class="c">${c}</td>`).join("")}</tr>` +
+    `<tr><th>counter &amp; ${mask}</th>${andRow.map((v, i) => cell(v, badAnd[i])).join("")}</tr>` +
+    `<tr><th>counter % ${n}</th>${modRow.map((v, i) => cell(v, badMod[i])).join("")}</tr>`;
+  const reach = [...new Set(Array.from({length:4*n}, (_, i) => i & mask))].sort((a,b)=>a-b);
+  const unused = Array.from({length:n}, (_, i) => i).filter(i => !reach.includes(i));
+  const v = $("#verdict");
+  if (pow2){
+    v.className = "verdict ok";
+    v.innerHTML = `<b>Every step moves to the next slot, across the wrap too.</b> The mask ${mask} is <code>0b${mask.toString(2)}</code>, all ones, and 2³² holds exactly ${(2 ** 32) / n} laps of ${n}. The last counter before the wrap lands in slot ${n - 1} and the first one after it lands in slot 0. Both rows agree.`;
+  } else {
+    const wi = badMod.findIndex(Boolean);
+    const lines = [];
+    lines.push(`The mask ${mask} is <code>0b${mask.toString(2)}</code>. It is not all ones, so <code>&amp; ${mask}</code> only reaches slots ${reach.join(", ")}.` + (unused.length ? ` Slots ${unused.join(", ")} are never used.` : ""));
+    if (wi > 0) lines.push(`Using <code>% ${n}</code> instead gives the right slots until the counter wraps. Then slot ${modRow[wi-1]} is followed by slot ${modRow[wi]}, not ${(modRow[wi-1] + 1) % n}. 2³² is not a whole number of laps of ${n}, so every wrap shifts the whole ring.`);
+    v.className = "verdict bad";
+    v.innerHTML = `<b>This size breaks.</b> ` + lines.join(" ");
+  }
+}
+
+/* ---------- start ---------- */
+buildRing();
+setMode("real");
+buildSizes();
+renderMask();
+renderWrap();
+reset(0);
+})();
+</script>
+</body>
+</html>

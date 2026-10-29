@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UART TX interrupt, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">lib/uart.c <span>TX interrupt</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#blocked">How long is main blocked</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">lib/uart.c · uart_putc, USART2_IRQHandler</div>
+    <h1 style="margin-top:14px">main queues the text. <em>The interrupt feeds the wire.</em></h1>
+    <p class="serif">The wire is about a thousand times slower than the CPU. So <code>uart_putc</code> only puts the byte in a ring and flips one switch, <code>TXEIE</code>. The interrupt handler then moves one byte at a time into the USART.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sequence">Step through "hi" →</a>
+      <a class="btn" href="#blocked">When does main wait?</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Peripheral</span><b>USART2 TX · PA2 · AF7</b></div>
+    <div><span>Time per byte</span><b>10 bits ÷ 115200 = 86.8 µs</b></div>
+    <div><span>TX ring</span><b>64 bytes (lib/ring.h)</b></div>
+    <div><span>Switch</span><b>CR1.TXEIE</b></div>
+    <div><span>IRQ line</span><b>TXEIE AND TXE</b></div>
+    <div><span>Armed</span><b>only while bytes are queued</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s"><i>CODE 1</i><b>uart_putc</b><span>push byte, set TXEIE</span></div>
+  <div class="s"><i>CODE 2</i><b>TX ring</b><span>g_tx, written by main</span></div>
+  <div class="s hw"><i>HW 3</i><b>TXE = 1</b><span>data register is empty</span></div>
+  <div class="s"><i>CODE 4</i><b>ISR</b><span>pop one byte, write DR</span></div>
+  <div class="s hw"><i>HW 5</i><b>Shift register</b><span>bits leave on PA2</span></div>
+  <div class="s hw"><i>HW 6</i><b>Terminal</b><span>one byte every 86.8 µs</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div><h2>Sending "hi"</h2>
+    <p>The first tab is the real code path. The other three break it on purpose, so you can see why each line is there. Watch <b>IRQ line</b>: it is high only when TXEIE and TXE are both 1.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="blocked">
+  <div class="sh"><div class="eyebrow">02 · when does main wait?</div><h2>How long is main blocked?</h2>
+    <p><code>uart_putc</code> waits only while the TX ring is full. Pick a message or drag the length. The first 64 bytes queue at once, then main is paced by the wire.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <span class="seg" id="presets"></span>
+      <label>Bytes <input type="range" id="len" min="1" max="200" value="67" aria-label="Message length in bytes"></label>
+      <span class="win-val" id="lenv"></span>
+    </div>
+    <div class="score" id="tx-score"></div>
+    <div id="tx-bar"></div>
+    <p class="hint" id="tx-hint"></p>
+  </div></div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>Push first, then arm</b>Armed with an empty ring, the ISR disarms at once and the byte is stuck (tab 2).</div>
+    <div><b>Disarm when the ring is empty</b>TXE stays 1 while idle. Left armed, the interrupt never stops (tab 3).</div>
+    <div><b>One byte per interrupt</b>The ISR writes one byte to DR. TXE rises again when DR empties, and that is the next interrupt.</div>
+    <div><b>A full ring blocks main</b>The while loop in uart_putc spins until the ISR frees a slot (tab 4, and the calculator).</div>
+    <div><b>First byte skips the wait</b>On an idle line a write to DR goes straight to the shift register and TXE is set again at once (RM0390 p. 781).</div>
+    <div><b>HardFault cannot use this</b>The ISR may not run, so <code>fault_putc</code> polls TXE and <code>uart_drain_polled</code> disarms the interrupt first.</div>
+  </div>
+</section>
+
+<footer>Source: lib/uart.c (lines 43–50, 52–55, 81–107), lib/ring.c · RM0390 §25.4.2 and USART_SR.TXE, p. 781 and 815</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence (line numbers are lib/uart.c) ---------- */
+(function () {
+  var SRC = [
+    [43, 'void uart_putc(char c)'], [44, '{'], [45, '    while (ring_full(&g_tx)) {'], [47, '    }'], [48, '    ring_push(&g_tx, (uint8_t)c);'], [49, '    USART2->CR1 |= USART_CR1_TXEIE;       /* make sure the ISR is armed */'], [50, '}'], [0, ''],
+    [52, 'void uart_puts(const char *s)'], [53, '{'], [54, '    print_str(uart_putc, s);'], [55, '}'], [0, ''],
+    [81, 'void USART2_IRQHandler(void)'], [82, '{'], [83, '    uint32_t sr = USART2->SR;'], [85, '    if ((sr & (USART_SR_RXNE | USART_SR_ORE)) != 0u) {'], [87, '        uint8_t byte = (uint8_t)USART2->DR;'], [89, '        if ((sr & USART_SR_ORE) != 0u) {'], [90, '            g_overruns++;'], [91, '        }'], [92, '        if ((sr & USART_SR_RXNE) != 0u) {'], [93, '            ring_push(&g_rx, byte);'], [94, '        }'], [95, '    }'],
+    [99, '    if (((USART2->CR1 & USART_CR1_TXEIE) != 0u) &&'], [100, '        ((USART2->SR & USART_SR_TXE) != 0u)) {'], [101, '        if (!ring_empty(&g_tx)) {'], [102, '            USART2->DR = ring_pop(&g_tx);'], [103, '        } else {'], [104, '            USART2->CR1 &= ~USART_CR1_TXEIE;'], [105, '        }'], [106, '    }'], [107, '}']
+  ];
+  var BASE = { ring: 0, TXEIE: 0, TXE: 1, DR: '—', shift: '—', terminal: '—' };
+  function base(o) { var r = {}, k; for (k in BASE) r[k] = BASE[k]; for (k in o) r[k] = o[k]; return r; }
+  var ISR = [81, 83, 85], TX = [99, 100];
+
+  var SCEN = [
+    { id: 'clean', tab: 'send_hi.seq', init: base({}), steps: [
+      { f: 'main', t: 'main', label: 'uart_puts("hi")', title: 'main prints "hi"', desc: 'uart_puts calls uart_putc once per character.', code: 'print_str(uart_putc, s);', lines: [54] },
+      { f: 'main', t: 'ring', label: "push 'h'", title: 'Queue the first byte', desc: 'The ring is not full, so the byte goes in. main does not touch the USART.', code: "while (ring_full(&g_tx)) { }\nring_push(&g_tx, 'h');", lines: [45, 48], set: { ring: 1 } },
+      { f: 'main', t: 'main', label: 'CR1 |= TXEIE', title: 'Arm the interrupt', desc: 'Done after the push. TXE is already 1 (data register empty), so the IRQ line goes high at once.', code: 'USART2->CR1 |= USART_CR1_TXEIE;', lines: [49], set: { TXEIE: 1 } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'The USART calls the handler', desc: 'No byte was received, so the receive branch is skipped.', code: 'void USART2_IRQHandler(void) {\n  uint32_t sr = USART2->SR;', lines: ISR },
+      { f: 'isr', t: 'isr', label: 'TXEIE && TXE', title: 'Transmit branch', desc: 'Both are 1, so this interrupt is a transmit request.', code: 'if ((CR1 & TXEIE) && (SR & TXE)) {', lines: TX },
+      { f: 'isr', t: 'ring', label: "ring_pop → 'h'", title: 'Take one byte', desc: 'The handler is the only reader of the TX ring.', code: 'if (!ring_empty(&g_tx)) {\n  USART2->DR = ring_pop(&g_tx);', lines: [101, 102], set: { ring: 0 } },
+      { f: 'isr', t: 'usart', label: "DR = 'h'", title: 'Hand it to the USART', desc: 'The line is idle, so the byte goes straight to the shift register and TXE is set again at once (RM0390 p. 781).', code: 'USART2->DR = ...;', lines: [102], set: { shift: 'h' } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ again', kind: 'irq', title: 'TXE is still 1', desc: 'TXEIE is still on, so the handler runs again before main continues.', code: 'void USART2_IRQHandler(void) {', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'isr', label: 'ring empty → TXEIE off', title: 'Nothing queued: disarm', desc: 'main has not pushed "i" yet. The handler turns the interrupt off, or TXE would call it forever.', code: '} else {\n  USART2->CR1 &= ~USART_CR1_TXEIE;\n}', lines: [103, 104], set: { TXEIE: 0 } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'main continues', desc: 'main was in the middle of uart_puts. It goes on to the next character.', code: '}', lines: [107] },
+      { f: 'main', t: 'ring', label: "push 'i'", title: 'Queue the second byte', desc: 'The ring holds one byte again. The interrupt is off, so nothing moves yet.', code: "ring_push(&g_tx, 'i');", lines: [45, 48], set: { ring: 1 } },
+      { f: 'main', t: 'main', label: 'CR1 |= TXEIE', title: 'Arm again', desc: 'TXE is 1, so the IRQ line goes high.', code: 'USART2->CR1 |= USART_CR1_TXEIE;', lines: [49], set: { TXEIE: 1 } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'Handler runs', desc: 'Same entry as before.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'usart', label: "pop → DR = 'i'", title: 'Second byte waits in DR', desc: '"h" is still shifting out, so "i" stays in the data register and TXE clears.', code: 'USART2->DR = ring_pop(&g_tx);', lines: [101, 102], set: { ring: 0, DR: 'i', TXE: 0 } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'main goes back to work', desc: 'The CPU is free for the next 87 µs while the wire is busy.', code: '}', lines: [107] },
+      { f: 'usart', t: 'term', label: "'h' on the wire", kind: 'good', title: 'First byte leaves', desc: 'After the stop bit, 86.8 µs from the start.', code: '/* hardware */', lines: [], set: { terminal: 'h' } },
+      { f: 'usart', t: 'usart', label: 'DR → shift register', title: 'Next byte starts', desc: 'The shifter is free, so "i" moves in and DR is empty again. TXE rises.', code: '/* hardware */', lines: [], set: { shift: 'i', DR: '—', TXE: 1 } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'One last interrupt', desc: 'TXEIE and TXE are both 1.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'isr', label: 'ring empty → TXEIE off', title: 'Disarm', desc: 'The queue is empty. The interrupt stays off until the next uart_putc.', code: 'USART2->CR1 &= ~USART_CR1_TXEIE;', lines: [103, 104], set: { TXEIE: 0 } },
+      { f: 'usart', t: 'term', label: "'i' on the wire", kind: 'good', title: 'Done', desc: 'An idle UART costs the CPU nothing.', code: '/* hardware */', lines: [], set: { terminal: 'hi' }, verdict: 'good', verdictText: 'Both bytes sent. TXEIE is off and the ring is empty.' }
+    ] },
+    { id: 'armfirst', tab: 'arm_before_push.seq', bug: true,
+      sheetNote: 'This tab runs lines 49 and 48 in the wrong order: it arms first, then pushes. The real code pushes first.',
+      init: base({}), steps: [
+      { f: 'main', t: 'main', label: 'uart_puts("h")', title: 'main prints "h"', desc: 'Same call as the real code.', code: 'print_str(uart_putc, s);', lines: [54] },
+      { f: 'main', t: 'main', label: 'CR1 |= TXEIE (first)', kind: 'bad', title: 'Armed before the push', desc: 'The ring is still empty, but TXE is 1, so the IRQ line goes high.', code: 'USART2->CR1 |= USART_CR1_TXEIE;   /* too early */', lines: [49], set: { TXEIE: 1 } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'The handler runs', desc: 'main has not pushed anything yet.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'isr', label: 'ring empty → TXEIE off', kind: 'bad', title: 'Disarm, as designed', desc: 'The ring is empty, so the handler turns the interrupt off.', code: 'USART2->CR1 &= ~USART_CR1_TXEIE;', lines: [103, 104], set: { TXEIE: 0 } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Back in main', desc: 'main continues with the push it was about to do.', code: '}', lines: [107] },
+      { f: 'main', t: 'ring', label: "push 'h'", title: 'The byte is queued', desc: 'The ring holds "h". The interrupt is off.', code: "ring_push(&g_tx, 'h');", lines: [45, 48], set: { ring: 1 } },
+      { f: 'usart', t: 'usart', label: 'TXE = 1, no IRQ', kind: 'bad', title: 'Nothing will pop it', desc: 'TXE is 1 but TXEIE is 0, so the IRQ line stays low.', code: '/* IRQ line = TXEIE AND TXE = 0 */', lines: [], verdict: 'bad', verdictText: '"h" stays in the ring until a later uart_putc arms the interrupt. The terminal shows nothing.' }
+    ] },
+    { id: 'nodisarm', tab: 'never_disarm.seq', bug: true, dim: [104],
+      sheetNote: 'This tab removes line 104 (CR1 &= ~TXEIE). The real code has it.',
+      init: base({ TXEIE: 1, TXE: 1, shift: '—' }), steps: [
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'The last byte just left', desc: 'DR is empty, so TXE is 1 and TXEIE is on.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'isr', label: 'ring empty, nothing to do', title: 'Empty ring', desc: 'The handler does not turn the interrupt off.', code: '} else {\n  /* TXEIE left on */\n}', lines: [103] },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Return to main', desc: 'TXE is still 1 and TXEIE is still 1.', code: '}', lines: [107] },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ again', kind: 'bad', title: 'The line is still high', desc: 'Nothing changed, so the interrupt fires again a moment later.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'isr', label: '… forever', kind: 'bad', title: 'An interrupt storm', desc: 'The handler returns and is called again, over and over.', code: '/* repeat */', lines: [103], verdict: 'bad', verdictText: 'main gets almost no CPU time. The ISR runs back to back.' }
+    ] },
+    { id: 'full', tab: 'ring_full.seq', init: base({ ring: 64, TXEIE: 1, TXE: 0, DR: 'b', shift: 'a' }), steps: [
+      { f: 'main', t: 'ring', label: 'ring_full? yes', kind: 'bad', title: '64 bytes are queued', desc: 'head − tail is 64, so there is no free slot.', code: 'while (ring_full(&g_tx)) {\n  /* the TX ISR drains one byte per TXE event */\n}', lines: [45, 47] },
+      { f: 'main', t: 'main', label: 'spin in while loop', kind: 'bad', title: 'main waits', desc: 'It does nothing else until the handler frees a slot. That takes up to one byte time, 86.8 µs.', code: 'while (ring_full(&g_tx)) { }', lines: [45] },
+      { f: 'usart', t: 'term', label: "'a' on the wire", kind: 'good', title: 'A byte finishes', desc: 'The wire is the pacemaker.', code: '/* hardware */', lines: [], set: { terminal: 'a' } },
+      { f: 'usart', t: 'usart', label: "DR → shift: 'b'", title: 'DR empties', desc: 'TXE rises.', code: '/* hardware */', lines: [], set: { shift: 'b', DR: '—', TXE: 1 } },
+      { f: 'usart', t: 'isr', label: 'TXE IRQ', kind: 'irq', title: 'Handler runs', desc: 'TXEIE and TXE are 1.', code: 'void USART2_IRQHandler(void)', lines: ISR.concat(TX) },
+      { f: 'isr', t: 'ring', label: 'ring_pop', title: 'One slot frees up', desc: 'The handler takes the oldest byte.', code: 'USART2->DR = ring_pop(&g_tx);', lines: [101, 102], set: { ring: 63, DR: 'c', TXE: 0 } },
+      { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'main runs again', desc: 'Its loop check now passes.', code: '}', lines: [107] },
+      { f: 'main', t: 'ring', label: 'ring_full? no → push', kind: 'good', title: 'The push goes through', desc: 'main waited about one byte time for one slot.', code: "ring_push(&g_tx, c);", lines: [45, 48, 49], set: { ring: 64 }, verdict: 'good', verdictText: 'A long message makes main wait once per byte after the first 64.' }
+    ] }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'lib/uart.c', key: 'uartTxSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'main', t: 'main', s: 'uart_putc' }, { id: 'ring', t: 'TX ring', s: 'g_tx' }, { id: 'isr', t: 'ISR', s: 'USART2_IRQHandler' },
+      { id: 'usart', t: 'USART2', s: 'hardware' }, { id: 'term', t: 'Terminal', s: 'PA2 wire' }
+    ],
+    derive: function (st) { return { 'IRQ line': (st.TXEIE && st.TXE) ? 1 : 0 }; }
+  });
+})();
+
+/* ---------- blocked-time calculator ---------- */
+(function () {
+  var BYTE_US = 10 / 115200 * 1e6;                       /* 8N1: start + 8 data + stop = 10 bits */
+  var RING = 64, SLACK = 2;                              /* ring + DR + shift register hold about 66 bytes */
+  /* strings from lib/cli.c (banner, line 132; prompt, line 27) and the usage lines of
+     lib/cli.c (19-21) and programs/uart_cli/main.c (37-38); help prints "  " + usage + "\r\n" each */
+  var banner = "\r\nSTM32F446 CLI ready. Type 'help'.\r\n" + '> ';
+  var help = ['led on|off', 'ticks', 'help', 'peek <addr>', 'poke <addr> <val>'].reduce(function (n, u) { return n + 2 + u.length + 2; }, 0);
+  var PRE = [['Banner', banner.length], ['help output', help], ['64 bytes', 64], ['200 bytes', 200]];
+  var len = $('len'), seg = $('presets');
+  PRE.forEach(function (p) {
+    var b = document.createElement('button'); b.textContent = p[0] + ' · ' + p[1];
+    b.setAttribute('aria-pressed', 'false');
+    b.onclick = function () { len.value = p[1]; render(); };
+    seg.appendChild(b);
+  });
+  function ms(us) { return us >= 1000 ? (us / 1000).toFixed(2) + ' ms' : us.toFixed(0) + ' µs'; }
+  function render() {
+    var n = +len.value, wire = n * BYTE_US, blocked = Math.max(0, n - (RING + SLACK)) * BYTE_US;
+    $('lenv').innerHTML = n + '<small>bytes</small>';
+    Array.prototype.forEach.call(seg.children, function (b, i) { b.setAttribute('aria-pressed', String(PRE[i][1] === n)); });
+    $('tx-score').innerHTML =
+      '<span class="chip">time on the wire ' + ms(wire) + '</span>' +
+      '<span class="chip ' + (blocked ? 'bad' : 'ok') + '">main blocked ≈ ' + (blocked ? ms(blocked) : 'not at all') + '</span>' +
+      '<span class="chip">queued at once ≈ ' + Math.min(n, RING + SLACK) + ' bytes</span>';
+    var q = Math.min(n, RING + SLACK) / n * 100;
+    $('tx-bar').innerHTML =
+      '<div style="display:flex;height:22px;border:1px solid var(--line);border-radius:4px;overflow:hidden;font:400 11px \'JetBrains Mono\',monospace">' +
+      '<div style="width:' + q + '%;background:color-mix(in srgb,var(--ok) 22%,var(--card));display:grid;place-items:center;color:var(--ok);white-space:nowrap">queued, main free</div>' +
+      (q < 100 ? '<div style="flex:1;background:color-mix(in srgb,var(--bad) 18%,var(--card));display:grid;place-items:center;color:var(--bad);white-space:nowrap">main waits per byte</div>' : '') + '</div>';
+    $('tx-hint').textContent = n <= RING + SLACK
+      ? 'The whole message fits in the ring, the data register and the shift register. main returns immediately.'
+      : 'Capacity is about 66 bytes (64 in the ring, one in DR, one in the shift register). Each byte beyond that costs main one 86.8 µs wait. Approximate: the exact count depends on when the interrupt first runs.';
+  }
+  len.addEventListener('input', render); render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tim_capture, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">tim_capture <span>TIM5 input capture</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#debounce">Debounce</a>
+    <a class="l" href="#registers">Registers</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/tim_capture/main.c</div>
+    <h1 style="margin-top:14px">The timer stamps the button press. <em>Your code reads the stamp.</em></h1>
+    <p class="serif">TIM5 never stops counting. On every edge of the button line it copies the count into <code>CCR1</code> by itself. Four small labs below let you step through it, break it, and tune it.</p>
+    <div class="cta">
+      <a class="btn dark" href="#sequence">Step through a press →</a>
+      <a class="btn" href="#debounce">Tune the debounce</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Timer</span><b>TIM5 · 32-bit</b></div>
+    <div><span>Pin</span><b>PA0 · AF2 · TIM5_CH1</b></div>
+    <div><span>Wire</span><b>CN7-23 → CN7-28</b></div>
+    <div><span>Tick</span><b>16 MHz ÷ 16 = 1 µs</b></div>
+    <div><span>HW filter</span><b>8 × 2 µs = 16 µs</b></div>
+    <div><span>Debounce</span><b>20 000 µs</b></div>
+  </div>
+</header>
+
+<div class="flow" role="list">
+  <div class="s hw"><i>HW 1</i><b>Button B1</b><span>PC13, pulls low when pressed</span></div>
+  <div class="s hw"><i>HW 2</i><b>Jumper</b><span>PC13 has no timer, so wire to PA0</span></div>
+  <div class="s hw"><i>HW 3</i><b>Filter</b><span>drops blips under 16 µs</span></div>
+  <div class="s hw"><i>HW 4</i><b>TIM5 capture</b><span>CNT copied into CCR1, IRQ raised</span></div>
+  <div class="s"><i>CODE 5</i><b>ISR</b><span>debounce, count presses</span></div>
+  <div class="s"><i>CODE 6</i><b>main</b><span>wakes from WFI, prints over UART</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div>
+    <h2>Event sequences</h2>
+    <p>Interrupt code is easier to read as a timeline than as functions. Pick a scenario, then step through. The panel shows the C line running and the values you would see in a debugger.</p></div>
+  <div id="seq"></div>
+</section>
+
+<section id="debounce">
+  <div class="sh"><div class="eyebrow">02 · tune DEBOUNCE_US</div>
+    <h2>How long must the line be quiet?</h2>
+    <p>Each bar is the quiet time before an edge (log scale). Edges whose bar ends left of the orange line are thrown out. Drag the line and watch what breaks.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <label>Sample data
+        <span class="seg" id="dset"><button aria-pressed="true" data-d="normal">One press</button><button aria-pressed="false" data-d="double">Fast double tap</button></span></label>
+      <label>Window <input type="range" id="slider" min="0" max="100" value="64" aria-label="Debounce window"></label>
+      <span class="win-val" id="wval"></span>
+      <button class="btn sm" id="wcode">Use 20 000 (the code)</button>
+    </div>
+    <div class="score" id="score"></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>#</th><th>Edge</th><th>Quiet before (µs)</th><th>Log scale 0.3 ms → 3 s</th><th>ISR says</th><th>Really was</th><th></th></tr></thead>
+      <tbody id="drows"></tbody>
+    </table></div>
+    <p class="hint" id="dhint"></p>
+  </div></div>
+</section>
+
+<section id="registers">
+  <div class="sh"><div class="eyebrow">03 · the numbers</div>
+    <h2>Registers and clock</h2>
+    <p>Click bits to build the values the program writes. Bit positions are from the F446 SVD; filter table from RM0390 §17.4.7.</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>TIM5-&gt;CCMR1 <span>0x40000C18 · input mode</span></h3>
+      <div class="f-names"><div class="g3" style="grid-column: span 4">IC1F [7:4]</div><div class="g2" style="grid-column: span 2">IC1PSC</div><div class="g1" style="grid-column: span 2">CC1S</div></div>
+      <div class="bits"><div class="row" id="b-ccmr"></div></div>
+      <div class="out" id="o-ccmr"></div>
+      <div class="kv" id="kv-ccmr"></div>
+      <div class="warnbox" id="w-cc1s">CC1S is locked while CC1E = 1. On hardware this write would be ignored. That is why the code sets CC1E last.</div>
+      <hr style="border:0;border-top:1px solid var(--line-2);margin:14px 0">
+      <h3>TIM5-&gt;CCER <span>0x40000C20</span></h3>
+      <div class="f-names"><div class="g1">CC1NP</div><div style="border-color:transparent">·</div><div class="g1">CC1P</div><div class="g1">CC1E</div></div>
+      <div class="bits"><div class="row" id="b-ccer"></div></div>
+      <div class="out" id="o-ccer"></div>
+      <div class="kv" id="kv-ccer"></div>
+      <div style="margin-top:12px"><button class="btn sm" id="load">Load the program's values</button></div>
+    </div>
+    <div style="display:grid;gap:16px;align-content:start">
+      <div class="card">
+        <h3>Tick and wrap <span>fCK = 16 MHz</span></h3>
+        <div class="inl">PSC <input type="number" id="psc" value="15" min="0" max="65535"> <button class="btn sm ghost" data-psc="0">0</button><button class="btn sm ghost" data-psc="15">15</button><button class="btn sm ghost" data-psc="159">159</button></div>
+        <div class="big" id="tick"></div>
+        <div class="kv" id="kv-clock"></div>
+      </div>
+      <div class="card">
+        <h3>Wrap-safe interval <span>unsigned</span></h3>
+        <div class="inl">old <input type="text" id="old" value="0xFFFFFF00"> new <input type="text" id="new" value="0x00000100"></div>
+        <div class="big" id="diff"></div>
+        <div class="kv" id="kv-diff"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><div class="eyebrow">04 · init order</div><h2>capture_init(), in order</h2></div>
+  <ol class="order">
+    <li><b>PA0 → AF2, pull-up</b><span>GPIOA clock, MODER0 = 10, AFSEL0 = 2, PUPD0 = 01</span></li>
+    <li><b>TIM5 clock + debug freeze</b><span>APB1ENR.TIM5EN, DBGMCU_APB1_FZ</span></li>
+    <li><b>Tick</b><span>PSC = 15, ARR = 0xFFFFFFFF</span></li>
+    <li><b>Channel 1 = input on TI1, filter</b><span>CC1S = 01, IC1F = 0xF</span></li>
+    <li class="key"><b>Both edges, then CC1E = 1</b><span>CC1S is write-locked once CC1E is set. Enable last.</span></li>
+    <li><b>Load, clear, arm, start</b><span>EGR.UG, SR = 0, DIER.CC1IE, NVIC, CR1.CEN</span></li>
+  </ol>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">05 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>Reading CCR1 clears CC1IF</b>Read it first in the ISR, even if you ignore the value.</div>
+    <div><b>Overcapture</b>A second edge before the read overwrites the stamp. CC1OF flags it. Clear by writing 0.</div>
+    <div><b>16 µs filter is not debounce</b>Bounce lasts ms. The ISR still checks the quiet time.</div>
+    <div><b>Read the pin inside the ISR</b>The edge was µs ago, so IDR still shows which way it went.</div>
+    <div><b>Why TIM5</b>lib/pwm.c owns TIM2. TIM5 is the other 32-bit timer.</div>
+    <div><b>71.6 min limit</b>One counter wrap between presses is fine. Two are not.</div>
+  </div>
+</section>
+
+<footer>Source: programs/tim_capture/main.c · RM0390 ch. 17 · SVD: svd/stm32f446re.svd</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+/* ---------- sequence lesson (lines are programs/tim_capture/main.c) ---------- */
+(function () {
+  var BASE = { CCR1: '1000000', CC1IF: 0, CC1OF: 0, g_presses: 1, g_interval_us: 0, g_bounces: 0, g_overcaptures: 0, seen: 1, main: 'WFI' };
+  function base(over) { var o = {}, k; for (k in BASE) o[k] = BASE[k]; for (k in over) o[k] = over[k]; return o; }
+
+  var SRC = [
+    [94, 'void TIM5_IRQHandler(void)'], [95, '{'], [96, '    static uint32_t last_edge;'], [97, '    static uint32_t last_press;'], [98, '    static int have_press;'],
+    [100, '    if ((TIM5->SR & TIM_SR_CC1IF) == 0u) {'], [101, '        return;'], [102, '    }'],
+    [104, '    uint32_t now = TIM5->CCR1;                      /* reading CCR1 clears CC1IF */'],
+    [109, '    if ((TIM5->SR & TIM_SR_CC1OF) != 0u) {'], [110, '        TIM5->SR = ~TIM_SR_CC1OF;'], [111, '        g_overcaptures++;'], [112, '    }'],
+    [114, '    uint32_t quiet = now - last_edge;'], [115, '    last_edge = now;'],
+    [117, '    if (quiet < DEBOUNCE_US) {'], [118, '        g_bounces++;'], [119, '        return;'], [120, '    }'],
+    [124, '    if ((GPIOA->IDR & GPIO_IDR_ID0) != 0u) {'], [125, '        return;                                     /* a clean release */'], [126, '    }'],
+    [128, '    if (have_press) {'], [129, '        g_interval_us = now - last_press;'], [130, '    }'],
+    [131, '    last_press = now;'], [132, '    have_press = 1;'], [133, '    g_presses++;'], [134, '}'],
+    [0, ''],
+    [148, 'int main(void)'], [149, '{'], [150, '    uart_init();'], [151, '    capture_init();'], [155, '    uint32_t seen = 0u;'],
+    [157, '    for (;;) {'],
+    [160, '        __disable_irq();'], [161, '        if (g_presses == seen) {'], [162, '            __WFI();'], [163, '            __enable_irq();'], [164, '            continue;'], [165, '        }'],
+    [166, '        uint32_t presses = g_presses;'], [167, '        uint32_t interval = g_interval_us;'], [168, '        uint32_t bounces = g_bounces;'], [169, '        uint32_t overcaptures = g_overcaptures;'],
+    [170, '        __enable_irq();'],
+    [172, '        uart_puts("press ");'], [173, '        print_dec32(uart_putc, presses);'], [174, '        if (presses == 1u) {'],
+    [175, '            uart_puts(": first press, timing starts");'], [176, '        } else {'], [177, '            uart_puts(": ");'],
+    [178, '            print_ms(interval);'], [179, '            uart_puts(" ms since the last press");'], [180, '        }'],
+    [181, '        uart_puts("  (bounces ignored: ");'], [182, '        print_dec32(uart_putc, bounces);'],
+    [183, '        uart_puts(", overcaptures: ");'], [184, '        print_dec32(uart_putc, overcaptures);'], [185, '        uart_puts(")\\r\\n");'],
+    [187, '        seen = presses;'], [188, '    }'], [189, '}']
+  ];
+
+  var SCEN = [
+    {
+      id: 'clean', tab: 'clean_press.seq', init: base({}),
+      steps: [
+        { f: 'pin', t: 'hw', label: 'PA0 falls', kind: '', title: 'You press the button', desc: 'PA0 goes low. The 16 µs filter waits for 8 equal samples, then lets the edge through.', code: '/* no code runs */' },
+        { f: 'hw', t: 'hw', label: 'CCR1 ← CNT', kind: '', title: 'Timer stamps the edge', desc: 'Hardware copies the live counter into CCR1 and raises CC1IF. The CPU is still asleep.', code: '/* hardware */  CCR1 = 2234567', set: { CCR1: '2234567', CC1IF: 1 } },
+        { f: 'hw', t: 'isr', label: 'TIM5 IRQ', kind: 'irq', title: 'Interrupt wakes the core', desc: 'CC1IE is on, so the flag becomes an interrupt. WFI ends and the ISR starts.', code: 'void TIM5_IRQHandler(void) {\n  if ((TIM5->SR & TIM_SR_CC1IF) == 0u) return;', set: { main: 'woken' } },
+        { f: 'isr', t: 'isr', label: 'now = CCR1', kind: '', title: 'Read the stamp', desc: 'Reading CCR1 also clears CC1IF. CC1OF is 0, so no stamp was lost.', code: 'uint32_t now = TIM5->CCR1;', set: { CC1IF: 0 } },
+        { f: 'isr', t: 'isr', label: 'quiet = 1 234 567', kind: '', title: 'Debounce check', desc: 'quiet = now − last_edge. It is far above 20 000, so this is not bounce.', code: 'uint32_t quiet = now - last_edge;\nif (quiet < DEBOUNCE_US) { ... }', note: 'quiet ≥ 20 000', noteAt: 'isr' },
+        { f: 'isr', t: 'pin', label: 'read IDR.ID0', kind: '', title: 'Which way did it go?', desc: 'The edge was microseconds ago, so the pin still shows its new level.', code: 'if (GPIOA->IDR & GPIO_IDR_ID0) return;' },
+        { f: 'pin', t: 'isr', label: '0 (low) = press', kind: 'ret', title: 'Low means pressed', desc: 'High would be a release and the ISR would return here.', code: '/* pin low, so continue */' },
+        { f: 'isr', t: 'isr', label: 'interval, presses++', kind: '', title: 'Publish the result', desc: 'The gap since the last press is stored for main. Both globals are volatile.', code: 'g_interval_us = now - last_press;\ng_presses++;', set: { g_interval_us: '1234567', g_presses: 2 } },
+        { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'ISR returns, main runs', desc: 'The __WFI() call finishes and main continues from there.', code: '}', set: { main: 'running' } },
+        { f: 'main', t: 'main', label: 'mask, compare, copy', kind: '', title: 'Take a snapshot', desc: 'IRQs are masked, so the four values all belong to the same press.', code: '__disable_irq();\nif (g_presses == seen) { ... }\npresses = g_presses; interval = g_interval_us; ...\n__enable_irq();' },
+        { f: 'main', t: 'uart', label: 'press 2: 1234.567 ms', kind: 'good', title: 'Print it', desc: 'Slow UART printing happens with interrupts back on.', code: 'uart_puts("press "); print_dec32(...);\nprint_ms(interval);' },
+        { f: 'main', t: 'main', label: 'seen = 2, WFI', kind: '', title: 'Back to sleep', desc: 'seen catches up, the loop repeats, and main sleeps again.', code: 'seen = presses;\n/* loop: __WFI() */', set: { seen: 2, main: 'WFI' } }
+      ]
+    },
+    {
+      id: 'bounce', tab: 'bounce.seq', init: base({ CCR1: '2234567', g_presses: 2, g_interval_us: 1234567, seen: 2 }),
+      steps: [
+        { f: 'pin', t: 'hw', label: 'PA0 rises (bounce)', kind: '', title: 'The contact chatters', desc: '900 µs after the press the metal bounces open. This blip is much longer than 16 µs, so the filter passes it.', code: '/* no code runs */' },
+        { f: 'hw', t: 'hw', label: 'CCR1 ← CNT', kind: '', title: 'Stamped like any edge', desc: 'The timer cannot tell bounce from a real edge.', code: '/* hardware */  CCR1 = 2235467', set: { CCR1: '2235467', CC1IF: 1 } },
+        { f: 'hw', t: 'isr', label: 'TIM5 IRQ', kind: 'irq', title: 'ISR runs again', desc: 'main is asleep and wakes just for this.', code: 'void TIM5_IRQHandler(void)', set: { main: 'woken' } },
+        { f: 'isr', t: 'isr', label: 'now = CCR1', kind: '', title: 'Read the stamp', desc: 'last_edge was the press stamp, 2 234 567.', code: 'uint32_t now = TIM5->CCR1;', set: { CC1IF: 0 } },
+        { f: 'isr', t: 'isr', label: 'quiet = 900 < 20 000', kind: 'bad', title: 'Too soon: bounce', desc: 'The line was not quiet long enough. Count it, remember this edge time, leave.', code: 'if (quiet < DEBOUNCE_US) {\n  g_bounces++;\n  return;\n}', set: { g_bounces: 1 }, note: 'last_edge = now', noteAt: 'isr' },
+        { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Back to main', desc: 'main wakes only because the ISR ran.', code: '}', set: { main: 'running' } },
+        { f: 'main', t: 'main', label: 'presses == seen → WFI', kind: '', title: 'Nothing new, sleep again', desc: 'g_presses did not change, so there is nothing to print. The bounce is only counted.', code: 'if (g_presses == seen) {\n  __WFI();\n  __enable_irq();\n  continue;\n}', set: { main: 'WFI' } }
+      ]
+    },
+    {
+      id: 'over', tab: 'overcapture.seq', init: base({ CCR1: '2234567', g_presses: 2, g_interval_us: 1234567, seen: 2 }),
+      steps: [
+        { f: 'pin', t: 'hw', label: 'edge A', kind: '', title: 'First edge', desc: 'Imagine a higher-priority interrupt is hogging the CPU.', code: '/* no code runs */' },
+        { f: 'hw', t: 'hw', label: 'CCR1 ← A', kind: '', title: 'Stamp A captured', desc: 'CC1IF is now 1. Nobody has read CCR1 yet.', code: '/* hardware */  CCR1 = 3000000', set: { CCR1: '3000000', CC1IF: 1 } },
+        { f: 'hw', t: 'isr', label: 'IRQ pending', kind: 'irq', title: 'ISR cannot start yet', desc: 'The interrupt is pending, but the CPU is busy elsewhere.', code: '/* waiting for the CPU */', note: 'blocked', noteAt: 'isr' },
+        { f: 'pin', t: 'hw', label: 'edge B', kind: '', title: 'Second edge arrives', desc: 'CC1IF is still 1 because CCR1 was not read.', code: '/* no code runs */' },
+        { f: 'hw', t: 'hw', label: 'CCR1 ← B, CC1OF=1', kind: 'bad', title: 'Stamp A is overwritten', desc: 'Hardware writes B over A and sets the overcapture flag. A is gone.', code: '/* hardware */  CCR1 = 3000700\n               SR.CC1OF = 1', set: { CCR1: '3000700', CC1OF: 1 } },
+        { f: 'isr', t: 'isr', label: 'now = CCR1 (B)', kind: '', title: 'ISR finally runs', desc: 'It reads B. CC1IF clears. The overcapture flag stays until written.', code: 'uint32_t now = TIM5->CCR1;', set: { CC1IF: 0 } },
+        { f: 'isr', t: 'isr', label: 'SR = ~CC1OF', kind: 'good', title: 'Notice and count it', desc: 'Writing 0 to a flag bit clears it. Writing 1 to the other bits leaves them alone.', code: 'if (TIM5->SR & TIM_SR_CC1OF) {\n  TIM5->SR = ~TIM_SR_CC1OF;\n  g_overcaptures++;\n}', set: { CC1OF: 0, g_overcaptures: 1 } },
+        { f: 'isr', t: 'isr', label: 'continues with B', kind: '', title: 'Carry on', desc: 'The rest is the usual debounce path using stamp B.', code: 'uint32_t quiet = now - last_edge;', note: 'g_overcaptures = 1', noteAt: 'isr' }
+      ]
+    },
+    {
+      id: 'torn', tab: 'torn_read.seq', bug: true, dim: [160, 170],
+      sheetNote: 'This tab runs main without lines 160 and 170 (the mask). The real code has them.',
+      init: base({ CCR1: '2234567', g_presses: 2, g_interval_us: 1234567, g_bounces: 4, seen: 1, copy_presses: '—', copy_interval: '—' }),
+      steps: [
+        { f: 'main', t: 'main', label: 'presses = g_presses', kind: '', title: 'Without masking: read #1', desc: 'main copies g_presses and gets 2. Interrupts are still on.', code: 'presses = g_presses;   /* = 2 */', set: { copy_presses: '2' } },
+        { f: 'hw', t: 'isr', label: 'TIM5 IRQ', kind: 'irq', title: 'A new press lands right now', desc: 'The ISR runs between two of main\'s reads.', code: 'void TIM5_IRQHandler(void)', set: { CCR1: '3034567', CC1IF: 1 } },
+        { f: 'isr', t: 'isr', label: 'interval, presses++', kind: '', title: 'ISR updates both', desc: 'Press 3 came 800 000 µs after press 2.', code: 'g_interval_us = now - last_press;\ng_presses++;', set: { g_interval_us: '800000', g_presses: 3, CC1IF: 0 } },
+        { f: 'isr', t: 'main', label: 'return', kind: 'ret', title: 'Back to main, mid-copy', desc: 'main carries on with the next line.', code: '}' },
+        { f: 'main', t: 'main', label: 'interval = g_interval_us', kind: 'bad', title: 'Read #2 is from press 3', desc: 'main now holds press number 2 with press 3\'s interval. The pair is torn.', code: 'interval = g_interval_us;   /* = 800000 */', set: { copy_interval: '800000' } },
+        { f: 'main', t: 'uart', label: 'press 2: 800.000 ms', kind: 'bad', title: 'Wrong output', desc: 'The true gap before press 2 was 1234.567 ms. Rare, hard to reproduce, and silent.', code: 'uart_puts(": "); print_ms(interval);', verdict: 'bad', verdictText: 'Printed press 2 with the interval of press 3.' }
+      ]
+    },
+    {
+      id: 'masked', tab: 'masked_read.seq',
+      init: base({ CCR1: '2234567', g_presses: 2, g_interval_us: 1234567, g_bounces: 4, seen: 1, copy_presses: '—', copy_interval: '—' }),
+      steps: [
+        { f: 'main', t: 'main', label: '__disable_irq()', kind: 'good', title: 'Lock the door', desc: 'PRIMASK is set. Interrupts can become pending but cannot run.', code: '__disable_irq();', set: { main: 'IRQ off' } },
+        { f: 'main', t: 'main', label: 'copy g_presses', kind: '', title: 'Read #1', desc: '', code: 'presses = g_presses;   /* = 2 */', set: { copy_presses: '2' } },
+        { f: 'hw', t: 'isr', label: 'IRQ pending', kind: 'irq', title: 'A new press lands now', desc: 'The flag is set, but the ISR must wait. Nothing is lost.', code: '/* pending, not running */', set: { CCR1: '3034567', CC1IF: 1 }, note: 'masked', noteAt: 'isr' },
+        { f: 'main', t: 'main', label: 'copy g_interval_us', kind: '', title: 'Read #2', desc: 'Still the interval that belongs to press 2.', code: 'interval = g_interval_us;   /* = 1234567 */', set: { copy_interval: '1234567' } },
+        { f: 'main', t: 'main', label: '__enable_irq()', kind: 'good', title: 'Open the door', desc: 'The pending interrupt now runs immediately.', code: '__enable_irq();', set: { main: 'running' } },
+        { f: 'isr', t: 'isr', label: 'interval, presses++', kind: '', title: 'ISR runs after the copy', desc: 'Press 3 is recorded. main will pick it up next loop.', code: 'g_interval_us = ...;  g_presses++;', set: { g_interval_us: '800000', g_presses: 3, CC1IF: 0 } },
+        { f: 'main', t: 'uart', label: 'press 2: 1234.567 ms', kind: 'good', title: 'Correct output', desc: 'Because main holds a matching pair, press 3 prints on the next pass.', code: 'print_ms(interval);', verdict: 'good', verdictText: 'Presses and interval match. Press 3 is printed next loop.' }
+      ]
+    }
+  ];
+
+  Seq.mount($('seq'), {
+    file: 'tim_capture/main.c', key: 'timCaptureSide', src: SRC, scenarios: SCEN,
+    lanes: [
+      { id: 'pin', t: 'Button', s: 'PA0 pin' }, { id: 'hw', t: 'TIM5', s: 'hardware' }, { id: 'isr', t: 'ISR', s: 'TIM5_IRQHandler' },
+      { id: 'main', t: 'main', s: 'for (;;)' }, { id: 'uart', t: 'UART', s: 'terminal' }
+    ],
+    lines: {
+      clean:  [[], [], [94, 100], [104], [114, 115, 117], [124], [124], [128, 129, 131, 132, 133], [134],
+               [163, 164, 160, 161, 166, 167, 168, 169, 170], [172, 173, 174, 177, 178, 179, 181, 182, 183, 184, 185], [187, 188]],
+      bounce: [[], [], [94, 100], [104], [114, 115, 117, 118, 119], [119], [163, 164, 160, 161, 162]],
+      over:   [[], [], [], [], [], [94, 100, 104], [109, 110, 111], [114]],
+      torn:   [[166], [94, 100], [128, 129, 131, 132, 133], [134], [167], [172, 173, 177, 178, 179]],
+      masked: [[160], [166], [], [167], [170], [94, 100, 128, 129, 131, 132, 133], [172, 173, 177, 178, 179]]
+    }
+  });
+})();
+
+/* ---------- debounce lab (mirrors TIM5_IRQHandler) ---------- */
+(function () {
+  var DATA = {
+    normal: {
+      hint: 'Press at 1.000 s, bounces for ~2 ms, released at 1.180 s with its own bounce, then pressed again at 2.234 s.',
+      ev: [[1000000, 0, 'press'], [1000900, 1, 'bounce'], [1001700, 0, 'bounce'], [1180000, 1, 'release'], [1181200, 0, 'bounce'], [1182100, 1, 'bounce'], [2234567, 0, 'press']]
+    },
+    double: {
+      hint: 'Two quick taps 90 ms apart. A window that is too long swallows the second tap.',
+      ev: [[1000000, 0, 'press'], [1000800, 1, 'bounce'], [1001500, 0, 'bounce'], [1050000, 1, 'release'], [1090000, 0, 'press'], [1090900, 1, 'bounce'], [1091700, 0, 'bounce'], [1140000, 1, 'release']]
+    }
+  };
+  var MIN = 50, RATIO = 4000;          /* slider 0..100 -> 50 µs .. 200 ms, log */
+  var LOG_LO = Math.log10(300), LOG_HI = Math.log10(3000000);
+  var pos = function (us) { return Math.max(0, Math.min(100, (Math.log10(Math.max(us, 1)) - LOG_LO) / (LOG_HI - LOG_LO) * 100)); };
+  var ds = 'normal', win = 20000, slider = $('slider');
+  function fromSlider() { return Math.round(MIN * Math.pow(RATIO, slider.value / 100)); }
+  function toSlider(us) { return Math.round(Math.log(us / MIN) / Math.log(RATIO) * 100); }
+
+  function run() {
+    var last = 0, rows = [], presses = 0, falseP = 0, missed = 0, real = 0, bounceQ = [], pressQ = [], firstPress = true;
+    DATA[ds].ev.forEach(function (e, i) {
+      var quiet = (e[0] - last) >>> 0; last = e[0];
+      var v = quiet < win ? 'bounce' : (e[1] ? 'release' : 'press');
+      var truth = e[2], status = 'ok', label = 'correct';
+      if (truth === 'press') { real++; if (!firstPress) pressQ.push(quiet); firstPress = false; }
+      if (truth === 'bounce') bounceQ.push(quiet);
+      if (v === 'press') presses++;
+      if (v !== truth) {
+        if (truth === 'release' && v === 'bounce') { status = 'soft'; label = 'release ignored, harmless'; }
+        else if (v === 'press') { status = 'bad'; label = 'false press'; falseP++; }
+        else if (truth === 'press') { status = 'bad'; label = 'missed press'; missed++; }
+        else { status = 'soft'; label = 'seen as release'; }
+      }
+      rows.push({ i: i + 1, rise: e[1], quiet: quiet, v: v, truth: truth, status: status, label: label });
+    });
+    return { rows: rows, presses: presses, falseP: falseP, missed: missed, real: real, lo: Math.max.apply(null, bounceQ) + 1, hi: Math.min.apply(null, pressQ) };
+  }
+  function render() {
+    var r = run();
+    $('wval').innerHTML = fmt(win) + '<small>µs' + (win >= 1000 ? ' · ' + (win / 1000).toFixed(win >= 10000 ? 0 : 1) + ' ms' : '') + '</small>';
+    var ok = r.presses === r.real;
+    $('score').innerHTML =
+      '<span class="chip ' + (ok ? 'ok' : 'bad') + '">presses counted ' + r.presses + ' / ' + r.real + ' real</span>' +
+      '<span class="chip ' + (r.falseP ? 'bad' : '') + '">false presses ' + r.falseP + '</span>' +
+      '<span class="chip ' + (r.missed ? 'bad' : '') + '">missed ' + r.missed + '</span>' +
+      '<span class="chip">safe window ' + fmt(r.lo) + ' – ' + fmt(r.hi) + ' µs</span>';
+    var tb = $('drows'); tb.textContent = '';
+    r.rows.forEach(function (x) {
+      var tr = document.createElement('tr'); if (x.status === 'bad') tr.className = 'wrong';
+      tr.innerHTML = '<td>' + x.i + '</td><td>' + (x.rise ? '↑ rise' : '↓ fall') + '</td><td>' + fmt(x.quiet) + '</td>' +
+        '<td class="bar"><div class="bartrack"><div class="fill" style="width:' + pos(x.quiet) + '%;background:' + (x.quiet < win ? 'var(--bad)' : 'var(--ok)') + '"></div><div class="thr" style="left:' + pos(win) + '%"></div></div></td>' +
+        '<td><span class="tag ' + x.v + '">' + x.v + '</span></td><td><span class="tag ' + x.truth + '">' + x.truth + '</span></td>' +
+        '<td class="st-' + x.status + '">' + (x.status === 'ok' ? '✓' : x.label) + '</td>';
+      tb.appendChild(tr);
+    });
+    $('dhint').textContent = DATA[ds].hint + ' Pick a window above the longest bounce gap and below the fastest real press gap.';
+  }
+  slider.addEventListener('input', function () { win = fromSlider(); render(); });
+  $('wcode').onclick = function () { win = 20000; slider.value = toSlider(20000); render(); };
+  Array.prototype.forEach.call($('dset').querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      ds = b.dataset.d;
+      Array.prototype.forEach.call($('dset').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      render();
+    };
+  });
+  slider.value = toSlider(20000); render();
+})();
+
+/* ---------- registers (bit positions: SVD; filter table: RM0390 17.4.7) ---------- */
+(function () {
+  var FILTER = [[0, 0]];  /* index -> [divider, N]; 0 = none */
+  [[1,2],[1,4],[1,8],[2,6],[2,8],[4,6],[4,8],[8,6],[8,8],[16,5],[16,6],[16,8],[32,5],[32,6],[32,8]].forEach(function (a) { FILTER.push(a); });
+  var ccmr = 0x000000F1, ccer = 0x0B;
+  var hex = function (v, w) { return '0x' + v.toString(16).toUpperCase().padStart(w, '0'); };
+
+  function makeBits(containerId, bits, getV, toggle) {
+    var c = $(containerId); c.textContent = '';
+    bits.forEach(function (b) {
+      var d = document.createElement('div');
+      var on = b >= 0 ? (getV() >> b) & 1 : 0;
+      d.className = 'bit' + (on ? ' on' : '') + (b < 0 ? ' dis' : '');
+      d.innerHTML = (b < 0 ? '0' : on) + '<small>' + (b < 0 ? '—' : b) + '</small>';
+      if (b >= 0) {
+        d.tabIndex = 0; d.setAttribute('role', 'switch'); d.setAttribute('aria-checked', on ? 'true' : 'false');
+        d.onclick = function () { toggle(b); };
+        d.onkeydown = function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(b); } };
+      }
+      c.appendChild(d);
+    });
+  }
+  function kv(id, rows) { $(id).innerHTML = rows.map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join(''); }
+
+  function render() {
+    makeBits('b-ccmr', [7, 6, 5, 4, 3, 2, 1, 0], function () { return ccmr; }, function (b) { ccmr ^= (1 << b); render(); });
+    makeBits('b-ccer', [3, -1, 1, 0], function () { return ccer; }, function (b) { ccer ^= (1 << b); render(); });
+    $('o-ccmr').innerHTML = 'TIM5-&gt;CCMR1 = <span>' + hex(ccmr, 8) + '</span>';
+    $('o-ccer').innerHTML = 'TIM5-&gt;CCER = <span>' + hex(ccer, 2) + '</span>';
+    var cc1s = ccmr & 3, psc = (ccmr >> 2) & 3, f = (ccmr >> 4) & 15;
+    var fl = FILTER[f], ft = fl[0] === 0 ? 'none (fDTS)' : (fl[1] * fl[0] / 16).toString().replace(/(\.\d{3})\d+/, '$1') + ' µs';
+    kv('kv-ccmr', [
+      ['CC1S', ['00 output (not capture)', '01 input, TI1 = PA0', '10 input, TI2', '11 input, TRC'][cc1s]],
+      ['IC1PSC', 'capture every ' + [1, 2, 4, 8][psc] + ' edge' + (psc ? 's' : '')],
+      ['IC1F = ' + f.toString(2).padStart(4, '0'), f === 0 ? 'no filter' : 'N=' + fl[1] + ' at fCK/' + fl[0]],
+      ['Filter delay', ft]
+    ]);
+    var np = (ccer >> 3) & 1, p = (ccer >> 1) & 1, e = ccer & 1;
+    var edge = (!np && !p) ? 'rising only' : (!np && p) ? 'falling only' : (np && p) ? 'both edges' : 'reserved';
+    kv('kv-ccer', [['Edges captured', edge], ['Channel', e ? 'enabled (CC1S locked)' : 'disabled']]);
+    $('w-cc1s').className = 'warnbox' + ((ccer & 1) && cc1s !== 1 ? ' show' : '');
+  }
+  $('load').onclick = function () { ccmr = 0xF1; ccer = 0x0B; render(); };
+  render();
+
+  function human(sec) {
+    if (sec < 1) return (sec * 1000).toPrecision(3) + ' ms';
+    if (sec < 120) return sec.toFixed(1) + ' s';
+    if (sec < 7200) return (sec / 60).toFixed(1) + ' min';
+    if (sec < 172800) return (sec / 3600).toFixed(1) + ' h';
+    return (sec / 86400).toFixed(1) + ' days';
+  }
+  function tickRender() {
+    var p = Math.max(0, Math.min(65535, parseInt($('psc').value, 10) || 0));
+    var f = 16e6 / (p + 1), tickUs = (p + 1) / 16;
+    $('tick').innerHTML = (tickUs >= 1 ? tickUs.toPrecision(4).replace(/\.?0+$/, '') : tickUs.toPrecision(3)) + ' µs <small>per tick</small>';
+    kv('kv-clock', [['Counter clock', (f >= 1e6 ? (f / 1e6).toPrecision(4).replace(/\.?0+$/, '') + ' MHz' : (f / 1e3).toPrecision(4) + ' kHz')], ['PSC + 1', p + 1], ['Wraps after 2³² ticks', human(4294967296 * tickUs / 1e6)]]);
+  }
+  $('psc').addEventListener('input', tickRender);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-psc]'), function (b) { b.onclick = function () { $('psc').value = b.dataset.psc; tickRender(); }; });
+  tickRender();
+
+  function parse(s) { s = s.trim(); var n = /^0x/i.test(s) ? parseInt(s, 16) : parseInt(s, 10); return isNaN(n) ? null : (n >>> 0); }
+  function diffRender() {
+    var o = parse($('old').value), n = parse($('new').value);
+    if (o === null || n === null) { $('diff').innerHTML = '—'; kv('kv-diff', []); return; }
+    var d = (n - o) >>> 0;
+    $('diff').innerHTML = fmt(d) + ' µs <small>' + (d >= 1000 ? '= ' + (d / 1000).toFixed(3) + ' ms' : '') + '</small>';
+    kv('kv-diff', [['new − old (uint32_t)', hex(d, 8)], ['Counter wrapped', n < o ? 'yes, still correct' : 'no'], ['Naive new &gt; old test', n > o ? 'true' : '<span style="color:var(--bad)">false (wrong)</span>']]);
+  }
+  $('old').addEventListener('input', diffRender); $('new').addEventListener('input', diffRender);
+  diffRender();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UART clock error, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.rowsel tr { cursor: pointer; }
+.rowsel tr:hover td { background: var(--card-2); }
+.rowsel tr.sel td { background: color-mix(in srgb, var(--ember) 9%, transparent); }
+.rowsel tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--ember); }
+.budget { height: 26px; border: 1px solid var(--line); border-radius: 4px; position: relative; overflow: hidden; background: var(--card); }
+.budget .seg1, .budget .seg2 { position: absolute; top: 0; bottom: 0; }
+.budget .seg1 { background: color-mix(in srgb, var(--ember) 35%, transparent); }
+.budget .seg2 { background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.budget .lim { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.budget .mid { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--line); }
+.lbl { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); display: flex; justify-content: space-between; margin-top: 3px; }
+.fs svg { width: 100%; height: auto; display: block; min-width: 640px; }
+.fs { overflow-x: auto; }
+.fs text { font-family: "JetBrains Mono", monospace; font-size: 10px; fill: var(--ink-3); }
+.fs .bit-box { fill: none; stroke: var(--line-2); }
+.fs .wave { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.fs .tick { stroke: var(--ink-3); stroke-width: 1; }
+.fs .dot-ok { fill: var(--ok); } .fs .dot-bad { fill: var(--bad); } .fs .dot-mid { fill: var(--warn); }
+.fs .rd-ok { fill: var(--ok); font-size: 11px; } .fs .rd-bad { fill: var(--bad); font-size: 11px; font-weight: 500; }
+.fs .fb { font-size: 11px; fill: var(--ink-2); }
+.strips svg { width: 100%; height: 34px; display: block; }
+.strips .nm { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); margin: 6px 0 2px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">UART <span>clock error</span></a>
+    <a class="l" href="#budget">Error budget</a>
+    <a class="l" href="#frame">Where samples land</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">lib/uart.c · UART_BRR · USART2 at 16 MHz</div>
+    <h1 style="margin-top:14px">No shared clock. <em>So how does the receiver stay in step?</em></h1>
+    <p class="serif">The receiver times every bit with its own clock. If that clock is a little off, the sample point slides across the bit. It restarts on every start bit, so the slide only has 10 bits to add up. Drag the error and watch where the samples land.</p>
+    <div class="cta">
+      <a class="btn dark" href="#frame">Drag the clock error →</a>
+      <a class="btn" href="#budget">Check my baud rate</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>USART clock</span><b>16 MHz</b></div>
+    <div><span>UART_BRR at 115200</span><b>(16 MHz + 57600) ÷ 115200 = 139</b></div>
+    <div><span>Actual baud</span><b>16 MHz ÷ 139 = 115 108</b></div>
+    <div><span>Error</span><b>−0.08 %</b></div>
+    <div><span>Oversampling</span><b>16×, 3-sample vote</b></div>
+    <div><span>Total budget</span><b>3.33 % (RM0390 Table 161)</b></div>
+  </div>
+</header>
+
+<section id="budget">
+  <div class="sh"><div class="eyebrow">01 · error budget</div><h2>Does your baud rate fit?</h2>
+    <p>The divider is a whole number, so the chip cannot hit every baud rate exactly. Pick a row. Then set how far off the <b>other side</b> is (the PC's USB-serial chip). Both errors share one budget.</p></div>
+  <div class="win"><div class="lab">
+    <div style="overflow-x:auto"><table class="rowsel">
+      <thead><tr><th>Baud</th><th>BRR = (clk + baud/2) ÷ baud</th><th>Mantissa . fraction</th><th>Actual baud</th><th>This side's error</th><th>Budget</th></tr></thead>
+      <tbody id="btbl"></tbody>
+    </table></div>
+    <div class="ctrls">
+      <label>Other side's error <input type="range" id="other" min="-300" max="300" value="0" aria-label="Other side's baud error in percent"></label>
+      <span class="win-val" id="otherv"></span>
+    </div>
+    <div>
+      <div class="budget" id="bbar"></div>
+      <div class="lbl"><span>−budget</span><span>0</span><span>+budget</span></div>
+    </div>
+    <div class="score" id="bscore"></div>
+    <p class="hint">Budget from RM0390 Tables 160 and 161 (p. 797) for 8 data bits, OVER8 = 0, ONEBIT = 0: <b>3.75 %</b> when the fraction is 0, <b>3.33 %</b> when it is not. It covers both ends and the line together. This chip runs from the 16 MHz HSI, an internal RC oscillator and not a crystal. Its own accuracy (datasheet Table 41, p. 106) eats into the same budget, so the slider matters even at 115200.</p>
+  </div></div>
+</section>
+
+<section id="frame">
+  <div class="sh"><div class="eyebrow">02 · where each sample lands</div><h2>One frame, ten bits</h2>
+    <p>A frame is a start bit (0), 8 data bits (LSB first) and a stop bit (1). The receiver finds the start edge, then samples the middle of each bit: ticks 8, 9 and 10 of 16 (RM0390 p. 783 and 785). Dots show the 9th sample. Dot colour: green = in the right bit, red = in a neighbour, amber = the three samples disagree.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <label>Byte <input type="text" id="byte" value="U" maxlength="1" style="width:46px" aria-label="Byte to send"></label>
+      <label>Receiver clock vs transmitter <input type="range" id="err" min="-800" max="800" value="400" aria-label="Receiver clock error in percent"></label>
+      <span class="win-val" id="errv"></span>
+      <span class="seg" id="mode"><button data-m="uart" aria-pressed="true">UART: restart on each start bit</button><button data-m="free" aria-pressed="false">No restart (free-running)</button></span>
+    </div>
+    <div class="fs"><svg id="fsvg" viewBox="0 0 780 190" role="img" aria-label="Three frames with sample points"></svg></div>
+    <div class="score" id="fscore"></div>
+    <div class="strips">
+      <div class="nm">Works at this error? UART mode (one frame)</div><svg id="s1" viewBox="0 0 800 34" preserveAspectRatio="none"></svg>
+      <div class="nm">Works at this error? no restart, 3 frames in a row</div><svg id="s2" viewBox="0 0 800 34" preserveAspectRatio="none"></svg>
+    </div>
+    <p class="hint" id="fhint"></p>
+  </div></div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>Errors add up</b>Transmitter, receiver, divider rounding and the line all share the same 3.33 %.</div>
+    <div><b>Fast baud rates round badly</b>At 16 MHz, 921600 needs BRR 17.36 and gets 17: +2.12 %. That alone uses 64 % of the budget.</div>
+    <div><b>The start bit is the reset</b>Each frame restarts the count, so drift only builds over 10 bits, not over the whole message.</div>
+    <div><b>The stop bit is the last to be sampled</b>It is the farthest from the start edge, so it fails first. A wrong stop bit shows up as a framing error.</div>
+    <div><b>OVER8 = 1 shrinks the budget</b>RM0390 Table 161: 2 % instead of 3.33 %. The program keeps OVER8 = 0.</div>
+    <div><b>Changing BRR mid-message</b>The baud counters update right after a write to BRR. Set it before the UART is enabled, as uart_init does.</div>
+  </div>
+</section>
+
+<footer>Source: lib/uart.c lines 6–9 and 33 · RM0390 §25.4.3–25.4.5, USART_BRR (SVD: DIV_Mantissa [15:4], DIV_Fraction [3:0]) · the sample-point model is a simplified calculation that ignores start-edge detection delay.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var fmt = function (n, d) { return n.toLocaleString('en-US', { maximumFractionDigits: d === undefined ? 0 : d, minimumFractionDigits: d === undefined ? 0 : d }); };
+var pct = function (x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d === undefined ? 2 : d) + ' %'; };
+
+/* ---------- 01 baud budget ---------- */
+(function () {
+  var CLK = 16e6, BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
+  var sel = 4, other = 0;
+  var rows = BAUDS.map(function (b) {
+    var brr = Math.floor((CLK + Math.floor(b / 2)) / b);            /* UART_BRR in lib/uart.c */
+    var actual = CLK / brr;
+    return { baud: b, brr: brr, man: brr >> 4, frac: brr & 15, actual: actual, err: (actual - b) / b * 100, tol: (brr & 15) ? 3.33 : 3.75 };
+  });
+  var tb = $('btbl');
+  rows.forEach(function (r, i) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + fmt(r.baud) + '</td><td>' + r.brr + ' (0x' + r.brr.toString(16).toUpperCase() + ')</td><td>' + r.man + ' . ' + r.frac + '</td><td>' + fmt(r.actual, 1) + '</td>' +
+      '<td class="' + (Math.abs(r.err) > r.tol / 2 ? 'st-bad' : '') + '">' + pct(r.err) + '</td><td></td>';
+    tr.onclick = function () { sel = i; render(); };
+    tr.tabIndex = 0; tr.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = i; render(); } };
+    tb.appendChild(tr);
+  });
+  function render() {
+    var r = rows[sel], tot = r.err + other, used = Math.abs(tot) / r.tol * 100;
+    Array.prototype.forEach.call(tb.children, function (tr, i) {
+      tr.className = i === sel ? 'sel' : '';
+      tr.lastChild.textContent = fmt(Math.abs(rows[i].err) / rows[i].tol * 100) + ' % used';
+    });
+    $('otherv').innerHTML = pct(other) + '<small>other side</small>';
+    var scale = r.tol * 1.6;                                           /* bar spans ±1.6 budgets */
+    var px = function (v) { return 50 + v / scale * 50; };
+    var a = r.err, b = r.err + other;
+    $('bbar').innerHTML =
+      '<div class="mid"></div>' +
+      '<div class="seg1" style="left:' + Math.min(px(0), px(a)) + '%;width:' + Math.abs(px(a) - px(0)) + '%"></div>' +
+      '<div class="seg2" style="left:' + Math.min(px(a), px(b)) + '%;width:' + Math.abs(px(b) - px(a)) + '%"></div>' +
+      '<div class="lim" style="left:' + px(-r.tol) + '%"></div><div class="lim" style="left:' + px(r.tol) + '%"></div>';
+    var ok = Math.abs(tot) < r.tol;
+    $('bscore').innerHTML =
+      '<span class="chip">BRR ' + r.brr + ' → ' + fmt(r.actual, 1) + ' baud</span>' +
+      '<span class="chip">this side ' + pct(r.err) + '</span>' +
+      '<span class="chip">total ' + pct(tot) + '</span>' +
+      '<span class="chip">budget ±' + r.tol.toFixed(2) + ' %</span>' +
+      '<span class="chip ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'fits, ' + fmt(used) + ' % used' : 'over budget, expect framing errors') + '</span>';
+  }
+  $('other').addEventListener('input', function () { other = $('other').value / 100; render(); });
+  render();
+})();
+
+/* ---------- 02 sample points inside frames ---------- */
+(function () {
+  var F = 3, BW = 26, X0 = 0, Y_HI = 24, Y_LO = 64;
+  var errEl = $('err'), mode = 'uart', byteEl = $('byte');
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(n, a, t) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (t != null) e.textContent = t; return e; }
+
+  /* TX bit index (in bit times from the first start edge) that the receiver's k-th tick of bit g lands in */
+  var land = function (e, g, k) { return (g + k / 16) / (1 + e); };
+
+  function bitsOf(b) { var a = [0]; for (var i = 0; i < 8; i++) a.push((b >> i) & 1); a.push(1); return a; }
+
+  /* which TX bit each of the three samples (ticks 8, 9, 10) of bit i in frame f falls in */
+  function reads(e, f, i) {
+    return [8, 9, 10].map(function (k) {
+      return mode === 'uart' ? f * 10 + Math.floor(land(e, i, k)) : Math.floor(land(e, f * 10 + i, k));
+    });
+  }
+  function posOf(e, f, i) { return mode === 'uart' ? f * 10 + land(e, i, 9) : land(e, f * 10 + i, 9); }
+  function strictOk(e, m) {                                           /* every sample of every bit in its own bit */
+    var save = mode; mode = m; var ok = true;
+    for (var f = 0; f < (m === 'uart' ? 1 : F); f++) for (var i = 0; i < 10; i++) {
+      reads(e, f, i).forEach(function (r) { if (r !== f * 10 + i) ok = false; });
+    }
+    mode = save; return ok;
+  }
+
+  function strip(id, m) {
+    var s = $(id); s.textContent = '';
+    var N = 320, lo = -0.08, hi = 0.08, first = null, last = null, e;
+    for (var j = 0; j < N; j++) {
+      e = lo + (hi - lo) * j / (N - 1);
+      var ok = strictOk(e, m);
+      if (ok) { if (first === null) first = e; last = e; }
+      s.appendChild(el('rect', { x: j * 800 / N, y: 6, width: 800 / N + .4, height: 14, fill: ok ? 'var(--ok)' : 'var(--bad)', opacity: ok ? .55 : .35 }));
+    }
+    var cur = +errEl.value / 10000;
+    s.appendChild(el('rect', { x: (cur - lo) / (hi - lo) * 800 - 1, y: 2, width: 2.4, height: 22, fill: 'var(--ink)' }));
+    var T = function (x, t, anchor) { s.appendChild(el('text', { x: x, y: 32, 'text-anchor': anchor, 'font-size': 9, 'font-family': 'JetBrains Mono, monospace', fill: 'var(--ink-3)' }, t)); };
+    T(2, '−8 %', 'start'); T(400, '0', 'middle'); T(798, '+8 %', 'end');
+    return first === null ? 'never' : (first * 100).toFixed(1) + ' % … ' + (last * 100).toFixed(1) + ' %';
+  }
+
+  function draw() {
+    var e = +errEl.value / 10000, ch = byteEl.value || 'U', byte = ch.charCodeAt(0) & 255;
+    $('errv').innerHTML = pct(e * 100, 2) + '<small>RX vs TX</small>';
+    var svg = $('fsvg'); svg.textContent = '';
+    var bits = []; for (var f = 0; f < F; f++) bits = bits.concat(bitsOf(byte));
+    var total = F * 10;
+    /* grid and labels */
+    for (var g = 0; g < total; g++) {
+      svg.appendChild(el('rect', { x: X0 + g * BW, y: 14, width: BW, height: 64, 'class': 'bit-box' }));
+      var i = g % 10;
+      svg.appendChild(el('text', { x: X0 + g * BW + BW / 2, y: 92, 'text-anchor': 'middle' }, i === 0 ? 'S' : i === 9 ? 'P' : 'D' + (i - 1)));
+    }
+    /* waveform */
+    var d = 'M' + X0 + ' ' + Y_HI, lv = 1;
+    bits.forEach(function (b, g) { var x = X0 + g * BW; if (b !== lv) d += ' L' + x + ' ' + (b ? Y_HI : Y_LO); d += ' L' + (x + BW) + ' ' + (b ? Y_HI : Y_LO); lv = b; });
+    svg.appendChild(el('path', { d: d, 'class': 'wave' }));
+    /* samples */
+    var rec = [];
+    for (var f2 = 0; f2 < F; f2++) {
+      var got = [], bad = false;
+      for (var i2 = 0; i2 < 10; i2++) {
+        var rd = reads(e, f2, i2), g2 = f2 * 10 + i2;
+        var inBit = rd.every(function (r) { return r === g2; }), centre = rd[1] === g2;
+        var cls = centre ? (inBit ? 'dot-ok' : 'dot-mid') : 'dot-bad';
+        [8, 10].forEach(function (k) { var x = X0 + posOfK(e, f2, i2, k) * BW; svg.appendChild(el('line', { x1: x, y1: 14, x2: x, y2: 78, 'class': 'tick' })); });
+        var x9 = X0 + posOf(e, f2, i2) * BW;
+        svg.appendChild(el('circle', { cx: x9, cy: 46, r: 4.2, 'class': cls }));
+        var val = rd[1] < bits.length ? bits[rd[1]] : 1;
+        got.push(val);
+        svg.appendChild(el('text', { x: X0 + g2 * BW + BW / 2, y: 108, 'text-anchor': 'middle', 'class': val === bits[g2] ? 'rd-ok' : 'rd-bad' }, String(val)));
+      }
+      var rb = 0; for (var q = 0; q < 8; q++) rb |= got[1 + q] << q;
+      var framing = got[0] !== 0 || got[9] !== 1, same = rb === byte && !framing;
+      rec.push({ f: f2, rb: rb, framing: framing, ok: same });
+      var cx = X0 + f2 * 10 * BW + 5 * BW;
+      var printable = rb >= 32 && rb < 127 ? " '" + String.fromCharCode(rb) + "'" : '';
+      svg.appendChild(el('text', { x: cx, y: 132, 'text-anchor': 'middle', 'class': 'fb', fill: same ? 'var(--ok)' : 'var(--bad)' },
+        'frame ' + (f2 + 1) + ': got 0x' + rb.toString(16).toUpperCase().padStart(2, '0') + printable + (framing ? ' · framing error' : '')));
+      svg.appendChild(el('text', { x: cx, y: 148, 'text-anchor': 'middle', 'class': 'fb', style: 'fill:' + (same ? 'var(--ok)' : 'var(--bad)') }, same ? 'correct' : 'wrong'));
+    }
+    svg.appendChild(el('text', { x: 2, y: 8 }, 'transmitted (what is on the wire)'));
+    svg.appendChild(el('text', { x: 2, y: 124 }, 'bit the receiver read at the 9th sample (red = wrong)'));
+    svg.appendChild(el('text', { x: 2, y: 176, 'font-size': 10 }, mode === 'uart'
+      ? 'Each frame restarts the receiver at its start edge, so frames 2 and 3 see the same drift as frame 1.'
+      : 'No restart: the receiver counts from the first start edge only, so the drift keeps growing frame after frame.'));
+    var ok = rec.filter(function (r) { return r.ok; }).length;
+    var b1 = strip('s1', 'uart'), b2 = strip('s2', 'free');
+    $('fscore').innerHTML =
+      '<span class="chip ' + (ok === F ? 'ok' : 'bad') + '">' + ok + ' of ' + F + ' frames correct</span>' +
+      '<span class="chip">UART mode works for ' + b1 + '</span><span class="chip">no restart works for ' + b2 + '</span>';
+    $('fhint').textContent = 'Strict model: every one of the three samples must land in its own bit. The lower limit matches RM0390 Table 160 (3.75 %). Real chips also lose up to one tick to start-edge detection, and tolerance is smaller with a fractional divider (3.33 %). The last frame can read right by luck: the line after it is idle high.';
+  }
+  function posOfK(e, f, i, k) { return mode === 'uart' ? f * 10 + land(e, i, k) : land(e, f * 10 + i, k); }
+
+  errEl.addEventListener('input', draw); byteEl.addEventListener('input', draw);
+  Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      mode = b.dataset.m;
+      Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      draw();
+    };
+  });
+  draw();
+})();
+</script>
+</body>
+</html>

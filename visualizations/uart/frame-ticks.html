@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UART receiver, tick by tick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.rx-top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: var(--card-2); overflow-x: auto; }
+.rxb { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 12px; border-bottom: 1px solid var(--line-2); align-items: center; font-size: 12px; color: var(--ink-3); }
+.rxb label { display: flex; gap: 6px; align-items: center; }
+.rxb input[type=number] { width: 58px; }
+.rxb .grp { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.fsvg { width: 100%; height: auto; display: block; }
+.fsvg text { font-family: "JetBrains Mono", monospace; font-size: 10px; fill: var(--ink-3); }
+.fsvg .lab { fill: var(--ink-2); }
+.fsvg .bx { stroke: var(--line-2); fill: none; }
+.strip { display: flex; gap: 3px; margin: 8px 0 2px; }
+.strip div { flex: 1; min-width: 0; text-align: center; font: 400 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-radius: 3px; padding: 4px 0; color: var(--ink-3); }
+.strip div.vote { border-color: var(--ok); color: var(--ok); }
+.strip div.chk { border-color: var(--warn); color: var(--warn); }
+.strip div.on { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.striplab { font-size: 11px; color: var(--ink-3); margin: 4px 0 0; }
+.chipstate { display: inline-block; font: 500 11px "JetBrains Mono", monospace; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink-2); margin-bottom: 6px; }
+.chipstate.a { color: var(--warn); border-color: var(--warn); } .chipstate.s { color: var(--ok); border-color: var(--ok); } .chipstate.e { color: var(--bad); border-color: var(--bad); }
+.cap { font-size: 13px; color: var(--ink-2); min-height: 84px; }
+.cap b { color: var(--ink); font-weight: 500; }
+.regs { display: flex; gap: 3px; flex-wrap: wrap; }
+.regs div { width: 34px; text-align: center; border: 1px solid var(--line); border-radius: 3px; padding: 3px 0 2px; font: 500 14px "JetBrains Mono", monospace; }
+.regs div small { display: block; font: 400 9px "JetBrains Mono", monospace; color: var(--ink-3); }
+.regs div.f { border-color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, var(--card)); }
+.flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.flags span { font: 400 11px "JetBrains Mono", monospace; padding: 2px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink-3); }
+.flags span.set { color: var(--bad); border-color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, transparent); }
+.tl { width: 100%; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">UART <span>receiver, tick by tick</span></a>
+    <a class="l" href="#rx">Step through</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">USART receiver · OVER8 = 0 · ONEBIT = 0</div>
+    <h1 style="margin-top:14px">The receiver counts 16 ticks per bit. <em>Then it votes.</em></h1>
+    <p class="serif">A falling edge wakes the receiver. It checks that the start bit is real, then reads the middle of every bit three times and takes the majority. Add noise and watch what the vote does, and what it cannot fix.</p>
+    <div class="cta"><a class="btn dark" href="#rx">Step through a frame →</a></div>
+  </div>
+  <div class="spec">
+    <div><span>Ticks per bit</span><b>16 (oversampling)</b></div>
+    <div><span>Start check</span><b>ticks 3, 5, 7 and 8, 9, 10</b></div>
+    <div><span>Data bits</span><b>majority of ticks 8, 9, 10</b></div>
+    <div><span>Disagreement</span><b>SR.NF (bit 2)</b></div>
+    <div><span>Stop bit not 1</span><b>SR.FE (bit 1)</b></div>
+    <div><span>Parity wrong</span><b>SR.PE (bit 0)</b></div>
+  </div>
+</header>
+
+<section id="rx">
+  <div class="sh"><div class="eyebrow">01 · step through</div><h2>One frame, one tick at a time</h2>
+    <p>Pick a frame and add noise. The tick cursor moves along the wire. Green ticks are votes, amber ticks check the start bit. Sources: RM0390 §25.4.3, p. 783 and 785.</p></div>
+  <div class="win">
+    <div class="rx-top" role="tablist"><div class="dots" style="display:flex;gap:6px;align-items:center;padding:0 14px"><i style="width:9px;height:9px;border-radius:50%;background:var(--line)"></i><i style="width:9px;height:9px;border-radius:50%;background:var(--line)"></i><i style="width:9px;height:9px;border-radius:50%;background:var(--line)"></i></div>
+      <button class="tab" data-t="frame" aria-selected="true" role="tab">frame.rx</button>
+      <button class="tab" data-t="idle" aria-selected="false" role="tab">idle_glitch.rx</button></div>
+    <div class="rxb" id="bar-frame">
+      <label>Character <input type="text" id="ch" maxlength="1" value="C" style="width:46px;text-align:center"></label>
+      <label>Parity <select id="par"><option value="none">None</option><option value="even" selected>Even</option><option value="odd">Odd</option></select></label>
+      <label>Baud <select id="baud"><option>1200</option><option selected>9600</option><option>115200</option><option>921600</option></select></label>
+      <span class="grp"><span>Noise</span>
+        <span class="seg" id="noise"><button data-n="none" aria-pressed="true">None</button><button data-n="flip" aria-pressed="false">Flip D3 (whole bit)</button><button data-n="glitch" aria-pressed="false">Short glitch</button></span></span>
+      <span class="grp" id="gl" style="display:none">
+        <label>in bit <select id="gb"></select></label>
+        <label>at tick <input type="number" id="go" min="0" max="15" value="8"></label>
+        <label>lasting <input type="number" id="gw" min="1" max="16" value="1"> ticks</label>
+      </span>
+    </div>
+    <div class="rxb" id="bar-idle" style="display:none">
+      <span>The line is idle (high). A low pulse arrives for</span>
+      <label><input type="range" id="iw" min="1" max="16" value="5"> <b id="iwv" class="mono" style="color:var(--ink)"></b></label>
+      <span>Does the receiver treat it as a start bit?</span>
+    </div>
+    <div class="seq" id="grid">
+      <div class="diagram" style="display:block"><svg id="svg" class="fsvg" viewBox="0 0 700 168" role="img" aria-label="Wire and receiver ticks"></svg>
+        <div class="strip" id="strip"></div><div class="striplab" id="striplab"></div></div>
+      <div class="rz" id="rz" role="separator" aria-orientation="vertical" aria-label="Resize" tabindex="0" title="Drag to resize · double-click to reset"></div>
+      <div class="panel">
+        <div class="ctl"><button class="btn sm" id="bk" aria-label="Back one tick">←</button><button class="btn sm dark" id="fw">Tick →</button>
+          <button class="btn sm" id="nx">Next sample</button><button class="btn sm ghost" id="play">Play</button><span class="n" id="tkv"></span></div>
+        <input type="range" id="tk" min="-4" max="163" step="1" value="-3" aria-label="Tick">
+        <div><span class="chipstate" id="state"></span><div class="cap" id="cap"></div></div>
+        <div><div class="striplab" style="margin:0 0 4px">Receive shift register</div><div class="regs" id="regs"></div></div>
+        <div><div class="striplab" style="margin:0 0 4px">Status flags (USART_SR)</div><div class="flags" id="flags"></div></div>
+        <div class="kv" id="res"></div>
+        <p class="hint" id="baudinfo"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">02 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>A whole flipped bit is invisible</b>All three samples agree, so the vote passes it. Only parity can catch it, and only for an odd number of flips.</div>
+    <div><b>A short glitch is voted away</b>If one of the three samples is hit, the majority is still right. The receiver sets NF to tell you it happened.</div>
+    <div><b>A wide glitch wins the vote</b>Hit two of the three samples and the wrong value wins. Try lasting 2 ticks at tick 8 or 9.</div>
+    <div><b>Idle glitches are rejected</b>A start bit must read 0 at ticks 3, 5, 7 and again at 8, 9, 10. A short low pulse fails that test and is ignored, with no flag.</div>
+    <div><b>Parity is one extra bit</b>Even parity makes the number of 1s (data + parity) even. It finds an odd number of wrong bits, not which.</div>
+    <div><b>The count restarts per frame</b>Every falling edge zeroes the tick counter, so the receiver never drifts across frames (see the clock error page).</div>
+  </div>
+</section>
+
+<footer>Source: RM0390 §25.4.3 (receiver, start bit detection p. 783, oversampling and majority vote p. 785), USART_SR (SVD: PE bit 0, FE bit 1, NF bit 2). The model counts ticks from the detected falling edge and ignores up to one tick of edge-detection delay.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var KMIN = -4;
+var C = { mode: 'frame', noise: 'none', k: -3, timer: null };
+var R = null;      /* receiver result for the current setup */
+
+/* ---------- model: what the wire carries and what the receiver decides ---------- */
+function build() {
+  var mode = C.mode, c = {}, bits, names, n, k;
+  if (mode === 'frame') {
+    var v = $('ch').value;
+    if (!v) return false;
+    var code = v.charCodeAt(0) & 127, par = $('par').value, data = [], i;
+    for (i = 0; i < 8; i++) data.push((code >> i) & 1);
+    var ones = data.reduce(function (a, b) { return a + b; }, 0), pbit = null;
+    if (par === 'even') pbit = ones % 2;
+    if (par === 'odd') pbit = 1 - ones % 2;
+    bits = [0].concat(data); if (pbit !== null) bits.push(pbit); bits.push(1);
+    names = ['Start'].concat(data.map(function (_, j) { return 'D' + j; })); if (pbit !== null) names.push('Parity'); names.push('Stop');
+    c = { code: code, par: par, pbit: pbit, flip: C.noise === 'flip', glitch: C.noise === 'glitch', gb: +$('gb').value, go: +$('go').value, gw: +$('gw').value };
+  } else {
+    bits = [1, 1]; names = ['', '']; c = { par: 'none', pbit: null, iw: +$('iw').value };
+  }
+  n = bits.length;
+  var tx = function (t) { var b = Math.floor(t / 16); return (t < 0 || b >= n) ? 1 : bits[b]; };
+  var wire = function (t) {
+    var w = tx(t), b = Math.floor(t / 16);
+    if (mode === 'idle') return (t >= 0 && t < c.iw) ? 0 : 1;
+    if (c.flip && b === 4 && t >= 0) w ^= 1;
+    if (c.glitch && t >= 16 * c.gb + c.go && t < 16 * c.gb + c.go + c.gw) w ^= 1;
+    return w;
+  };
+  /* start check: ticks 3, 5, 7 then 8, 9, 10 (RM0390 p. 783) */
+  var A = [3, 5, 7].map(wire), B = [8, 9, 10].map(wire);
+  var zA = A.filter(function (x) { return x === 0; }).length, zB = B.filter(function (x) { return x === 0; }).length;
+  var start = (zA === 3 && zB === 3) ? 'ok' : (zA >= 2 && zB >= 2) ? 'ne' : 'abort';
+  var abortK = zA < 2 ? 7 : 10;
+  var votes = [], b, nf = start === 'ne';
+  if (mode === 'frame' && start !== 'abort') {
+    for (b = 1; b < n; b++) {
+      var vals = [8, 9, 10].map(function (o) { return wire(16 * b + o); });
+      var on = vals[0] + vals[1] + vals[2], maj = on >= 2 ? 1 : 0, dis = on !== 0 && on !== 3;
+      if (dis) nf = true;
+      votes[b] = { vals: vals, maj: maj, nf: dis };
+    }
+  }
+  var res = { n: n, bits: bits, names: names, tx: tx, wire: wire, A: A, B: B, start: start, abortK: abortK, votes: votes, nf: nf, mode: mode, c: c };
+  if (mode === 'frame' && start !== 'abort') {
+    var rb = 0, i2; for (i2 = 0; i2 < 8; i2++) rb |= votes[1 + i2].maj << i2;
+    var tot = 0; for (i2 = 1; i2 <= 8; i2++) tot += votes[i2].maj;
+    var pm = c.pbit !== null ? votes[9].maj : 0;
+    res.byte = rb; res.fe = votes[n - 1].maj !== 1;
+    res.pe = c.par === 'none' ? false : (c.par === 'even' ? (tot + pm) % 2 !== 0 : (tot + pm) % 2 !== 1);
+    res.tot = tot + pm;
+  }
+  res.kmax = mode === 'frame' ? 16 * n + 3 : 24;
+  return res;
+}
+
+/* ---------- text for each tick ---------- */
+function nm(b) { return R.names[b]; }
+function describe(k) {
+  var n = R.n, c = R.c;
+  if (k < 0) return { s: 'Idle', c: '', t: 'The line is high, so there is nothing to do. The tick clock runs, but the receiver only watches for a drop from 1 to 0.' };
+  if (k === 0) return { s: 'Falling edge', c: 'a', t: 'The line was 1 and is now 0. This wakes the receiver. It zeroes its tick counter. It cannot yet tell a real start bit from a noise spike.' };
+  if (k <= 10) {
+    var wv = R.wire(k), isS = k === 3 || k === 5 || k === 7 || k === 8 || k === 9 || k === 10;
+    if (!isS) return { s: 'Counting', c: '', t: 'Counting ticks since the edge: ' + k + '. The first start check is at tick 3.' };
+    var set = k <= 7 ? 'first check (ticks 3, 5, 7)' : 'second check (ticks 8, 9, 10)';
+    if (k === 7 && R.A.filter(function (x) { return x === 0; }).length < 2) return { s: 'Start rejected', c: 'e', t: 'Tick 7 reads ' + wv + '. Fewer than two of the three first-check samples are 0, so this is not a start bit. The receiver returns to idle with no flag.' };
+    if (k === 10) {
+      if (R.start === 'abort') return { s: 'Start rejected', c: 'e', t: 'Tick 10 reads ' + wv + '. The second check does not have two 0s, so the start bit is not confirmed. The receiver goes back to idle and waits for another falling edge. No flag is set.' };
+      if (R.start === 'ne') return { s: 'Start accepted, noise', c: 'a', t: 'Tick 10 reads ' + wv + '. At least two of three samples were 0 in both checks, so the start bit is accepted, but NF is set because they did not all agree.' };
+      return { s: 'Start confirmed', c: 's', t: 'Tick 10 reads ' + wv + '. All six samples were 0. The start bit is real. From here the receiver samples every 16 ticks (ticks 8, 9, 10 of each bit).' };
+    }
+    if (R.start === 'abort' && k > R.abortK) return { s: 'Idle', c: '', t: 'Start rejected earlier.' };
+    return { s: 'Start check', c: 'a', t: 'Tick ' + k + ' (' + set + ') reads ' + wv + '.' };
+  }
+  if (R.start === 'abort') return { s: 'Idle again', c: '', t: R.mode === 'idle' ? 'The pulse is gone and the line is high again. The receiver ignored it. No byte, no flag, nothing for your code to see.' : 'The start bit was rejected, so no frame is received. The receiver waits for the next falling edge.' };
+  if (R.mode === 'idle') return { s: 'Receiving', c: 's', t: 'The start bit was accepted, so the receiver now expects data bits. A long enough low pulse looks exactly like the start of a frame.' };
+  var b = Math.floor(k / 16), pos = k % 16;
+  if (b >= n) return { s: 'Idle again', c: '', t: 'The frame is done. The receiver re-arms and waits for the next falling edge.' };
+  var vt = R.votes[b];
+  if (pos < 8) return { s: 'Counting', c: '', t: 'Not sampling now, even if the line changes. ' + (8 - pos) + ' more tick' + (8 - pos === 1 ? '' : 's') + ' until the middle of ' + nm(b) + '.' };
+  if (pos > 10) return { s: 'Counting', c: '', t: 'Done with ' + nm(b) + '. The rest of the bit is spare time. ' + (16 - pos + 8) + ' ticks to the middle of the next one.' };
+  var which = pos - 7, here = vt.vals[pos - 8];
+  if (pos < 10) return { s: 'Vote ' + which + ' of 3', c: 'a', t: 'Sample ' + pos + ' of ' + nm(b) + ' reads ' + here + '.' };
+  var name = nm(b), txv = R.bits[b], tail = '';
+  if (vt.nf) tail = ' The three samples disagree, so NF is set. The vote still gives ' + vt.maj + (vt.maj === txv ? ', which is the sent value.' : ', which is NOT the sent value.');
+  if (b === n - 1) {
+    var okS = vt.maj === 1;
+    return { s: okS ? 'Stop bit ok' : 'Framing error', c: okS ? (vt.nf ? 'a' : 's') : 'e', t: 'Votes ' + vt.vals.join(', ') + ', majority ' + vt.maj + '.' + tail + (okS ? ' The stop bit must be 1, so the framing is valid.' : ' The stop bit must be 1, so FE is set.') + ' Byte = 0x' + R.byte.toString(16).toUpperCase().padStart(2, '0') + (R.byte >= 32 && R.byte < 127 ? ' "' + String.fromCharCode(R.byte) + '"' : '') + '.' + (R.pe ? ' Parity failed, so PE is set.' : '') };
+  }
+  if (c.pbit !== null && b === 9)
+    return { s: R.pe ? 'Parity error' : 'Parity ok', c: R.pe ? 'e' : 's', t: 'Votes ' + vt.vals.join(', ') + ', majority ' + vt.maj + '.' + tail + ' The count of 1s in data + parity is ' + R.tot + '. ' + (c.par === 'even' ? 'Even' : 'Odd') + ' parity expects an ' + (c.par === 'even' ? 'even' : 'odd') + ' count, so ' + (R.pe ? 'the check FAILS: a bit was corrupted, but not which one.' : 'the check passes.') };
+  return { s: 'Majority of ' + name, c: vt.nf ? 'a' : 's', t: 'Votes ' + vt.vals.join(', ') + ', majority <b>' + vt.maj + '</b>. It shifts into the register as bit ' + (b - 1) + ' of the byte (least significant first).' + tail + (R.c.flip && b === 4 && !vt.nf ? ' Noise flipped this whole bit, so all three samples agree and the receiver cannot know.' : '') };
+}
+
+/* ---------- drawing ---------- */
+var X0 = 40;
+function geo() { var BW = 620 / R.n; return { BW: BW, xt: function (t) { return X0 + t / 16 * BW; } }; }
+var NS = 'http://www.w3.org/2000/svg';
+function el(n, a, t) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (t != null) e.textContent = t; return e; }
+function drawStatic() {
+  var g = geo(), svg = $('svg'); svg.textContent = '';
+  var YH = 50, YL = 92, lv = function (v) { return v ? YH : YL; };
+  var under = el('g', { id: 'under' }), over = el('g', { id: 'over' });
+  svg.appendChild(under);
+  for (var i = 0; i <= R.n; i++) svg.appendChild(el('line', { x1: g.xt(i * 16), y1: 40, x2: g.xt(i * 16), y2: 100, class: 'bx' }));
+  R.names.forEach(function (s, i) { svg.appendChild(el('text', { x: g.xt(i * 16 + 8), y: 34, 'text-anchor': 'middle' }, s)); });
+  svg.appendChild(el('text', { x: 4, y: 12, class: 'lab' }, R.mode === 'frame' ? 'Wire (solid). Sent, if noise changed it (dashed).' : 'Wire (a low pulse on an idle line)'));
+  /* sent (dashed) vs wire (solid), one step per tick */
+  var path = function (f) { var d = 'M' + g.xt(KMIN) + ' ' + lv(f(KMIN)), prev = f(KMIN); for (var t = KMIN + 1; t <= R.kmax; t++) { var v = f(t); if (v !== prev) d += ' L' + g.xt(t) + ' ' + lv(prev) + ' L' + g.xt(t) + ' ' + lv(v); prev = v; } return d + ' L' + g.xt(R.kmax) + ' ' + lv(prev); };
+  var differs = false; for (var t = 0; t <= R.kmax; t++) if (R.wire(t) !== R.tx(t)) differs = true;
+  if (differs && R.mode === 'frame') svg.appendChild(el('path', { d: path(R.tx), fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
+  svg.appendChild(el('path', { d: path(R.wire), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
+  /* tick row */
+  var YT = 128;
+  svg.appendChild(el('line', { x1: g.xt(KMIN), y1: YT, x2: g.xt(R.kmax), y2: YT, stroke: 'var(--line)' }));
+  for (t = KMIN; t <= R.kmax; t++) {
+    var x = g.xt(t), pos = ((t % 16) + 16) % 16, b = Math.floor(t / 16), inFrame = t >= 0 && b < R.n && R.mode === 'frame';
+    var vote = inFrame && b >= 1 && pos >= 8 && pos <= 10 || (R.mode === 'idle' && t >= 8 && t <= 10) || (R.mode === 'frame' && b === 0 && t >= 8 && t <= 10);
+    var chk = t === 3 || t === 5 || t === 7;
+    var col = t === 0 ? 'var(--warn)' : vote ? 'var(--ok)' : chk ? 'var(--warn)' : 'var(--line)';
+    svg.appendChild(el('line', { x1: x, y1: YT, x2: x, y2: YT - (t === 0 || vote || chk ? 14 : 6), stroke: col, 'stroke-width': (t === 0 || vote || chk) ? 2 : 1 }));
+  }
+  svg.appendChild(el('text', { x: 4, y: 160, class: 'lab' }, 'Receiver ticks (16 per bit). Green = vote, amber = start check, number under a bit = majority read.'));
+  svg.appendChild(over);
+}
+function drawDyn() {
+  var g = geo(), k = C.k, under = $('under'), over = $('over'), YH = 50, YL = 92, lv = function (v) { return v ? YH : YL; };
+  under.textContent = ''; over.textContent = '';
+  if (R.mode === 'frame' && k >= 0 && Math.floor(k / 16) < R.n) {
+    var b = Math.floor(k / 16);
+    under.appendChild(el('rect', { x: g.xt(b * 16), y: 40, width: g.BW, height: 60, fill: 'var(--ember)', opacity: .08 }));
+  }
+  var dot = function (t, col) { over.appendChild(el('circle', { cx: g.xt(t), cy: lv(R.wire(t)), r: 3.6, fill: col })); };
+  [3, 5, 7, 8, 9, 10].forEach(function (t) { if (k >= t && !(R.start === 'abort' && t > R.abortK)) dot(t, t < 8 ? 'var(--warn)' : 'var(--ok)'); });
+  if (R.mode === 'frame' && R.start !== 'abort') for (var b2 = 1; b2 < R.n; b2++) {
+    [8, 9, 10].forEach(function (o) { if (k >= 16 * b2 + o) dot(16 * b2 + o, 'var(--ok)'); });
+    if (k >= 16 * b2 + 10) {
+      var v = R.votes[b2], x = g.xt(16 * b2 + 9);
+      over.appendChild(el('text', { x: x, y: 150, 'text-anchor': 'middle', fill: v.maj === R.bits[b2] ? 'var(--ok)' : 'var(--bad)', style: 'font-size:12px;font-weight:500;fill:' + (v.maj === R.bits[b2] ? 'var(--ok)' : 'var(--bad)') }, String(v.maj)));
+    }
+  }
+  over.appendChild(el('line', { x1: g.xt(k), y1: 38, x2: g.xt(k), y2: 132, stroke: 'var(--ember)', 'stroke-width': 1.6 }));
+}
+function drawStrip() {
+  var k = C.k, pos = ((k % 16) + 16) % 16, active = k >= 0 && !(R.mode === 'frame' && Math.floor(k / 16) >= R.n);
+  var h = '';
+  for (var i = 0; i < 16; i++) h += '<div class="' + (i >= 8 && i <= 10 ? 'vote ' : (i === 3 || i === 5 || i === 7) ? 'chk ' : '') + (active && i === pos ? 'on' : '') + '">' + i + '</div>';
+  $('strip').innerHTML = h;
+  $('striplab').textContent = active ? 'Tick counter inside the current bit. Green = the three votes. Amber = start check (first bit only).' : 'Tick counter: not counting, the receiver is idle.';
+}
+function drawInfo() {
+  var d = describe(C.k);
+  $('state').textContent = d.s; $('state').className = 'chipstate ' + d.c;
+  $('cap').innerHTML = d.t;
+}
+function drawRegs() {
+  var k = C.k, h = '';
+  if (R.mode === 'frame') {
+    var cells = []; for (var i = 0; i < 8; i++) cells.push(['D' + i, 1 + i]); if (R.c.pbit !== null) cells.push(['P', 9]);
+    cells.forEach(function (c) { var v = R.votes[c[1]], done = v && k >= 16 * c[1] + 10; h += '<div class="' + (done ? 'f' : '') + '"><small>' + c[0] + '</small>' + (done ? v.maj : '·') + '</div>'; });
+  } else h = '<span class="hint">No frame to receive.</span>';
+  $('regs').innerHTML = h;
+  var end = R.mode === 'frame' ? 16 * (R.n - 1) + 10 : 10, done2 = k >= end;
+  var nf = done2 && R.nf, fe = done2 && R.fe, pe = done2 && R.pe;
+  $('flags').innerHTML = '<span class="' + (nf ? 'set' : '') + '">NF noise</span><span class="' + (fe ? 'set' : '') + '">FE framing</span><span class="' + (pe ? 'set' : '') + '">PE parity</span>';
+  var r = '';
+  if (R.mode === 'frame') {
+    if (R.start === 'abort') r = k >= 10 ? '<div><span>Result</span><b>no frame received</b></div>' : '';
+    else if (k >= end) { var ok = R.byte === R.c.code && !R.fe && !R.pe; r = '<div><span>Received</span><b class="' + (ok ? 'ok-t' : 'bad-t') + '">0x' + R.byte.toString(16).toUpperCase().padStart(2, '0') + (R.byte >= 32 && R.byte < 127 ? ' "' + String.fromCharCode(R.byte) + '"' : '') + '</b></div><div><span>Sent</span><b>0x' + R.c.code.toString(16).toUpperCase().padStart(2, '0') + ' "' + String.fromCharCode(R.c.code) + '"</b></div>'; }
+  } else if (k >= 10) r = '<div><span>Result</span><b class="' + (R.start === 'abort' ? 'ok-t' : 'bad-t') + '">' + (R.start === 'abort' ? 'ignored, no flag' : 'treated as a start bit') + '</b></div>';
+  $('res').innerHTML = r;
+}
+function update() {
+  C.k = Math.max(KMIN, Math.min(R.kmax, C.k));
+  $('tk').max = R.kmax; $('tk').value = C.k; $('tkv').textContent = 'tick ' + C.k;
+  drawDyn(); drawStrip(); drawInfo(); drawRegs();
+}
+function baudInfo() {
+  var bd = +$('baud').value, bt = 1e6 / bd, tt = bt / 16, f = bd * 16;
+  $('baudinfo').textContent = 'At ' + bd.toLocaleString('en-US') + ' baud one bit is ' + bt.toFixed(1) + ' µs, so one tick is ' + tt.toFixed(2) + ' µs and the receiver counts at ' + (f >= 1e6 ? (f / 1e6).toFixed(2) + ' MHz' : (f / 1e3).toFixed(1) + ' kHz') + '.';
+}
+function stop() { clearInterval(C.timer); C.timer = null; $('play').textContent = 'Play'; }
+function rebuild() {
+  stop();
+  var r = build(); if (!r) return;
+  R = r; drawStatic(); update();
+}
+function fillBits() {
+  var sel = $('gb'), cur = sel.value, names = ['Start'], i; for (i = 0; i < 8; i++) names.push('D' + i); if ($('par').value !== 'none') names.push('Parity'); names.push('Stop');
+  sel.innerHTML = names.map(function (nme, j) { return '<option value="' + j + '">' + nme + '</option>'; }).join('');
+  sel.value = cur && +cur < names.length ? cur : '2';
+}
+
+/* ---------- controls ---------- */
+['ch', 'par', 'gb', 'go', 'gw', 'iw'].forEach(function (id) { $(id).addEventListener('input', function () { if (id === 'par') fillBits(); $('iwv').textContent = $('iw').value + ' ticks'; rebuild(); }); });
+$('baud').addEventListener('change', baudInfo);
+Array.prototype.forEach.call($('noise').querySelectorAll('button'), function (b) {
+  b.onclick = function () {
+    C.noise = b.dataset.n;
+    Array.prototype.forEach.call($('noise').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+    $('gl').style.display = C.noise === 'glitch' ? 'flex' : 'none'; rebuild();
+  };
+});
+Array.prototype.forEach.call(document.querySelectorAll('.rx-top .tab'), function (t) {
+  t.onclick = function () {
+    C.mode = t.dataset.t; C.k = -3;
+    Array.prototype.forEach.call(document.querySelectorAll('.rx-top .tab'), function (o) { o.setAttribute('aria-selected', String(o === t)); });
+    $('bar-frame').style.display = C.mode === 'frame' ? 'flex' : 'none'; $('bar-idle').style.display = C.mode === 'idle' ? 'flex' : 'none';
+    rebuild();
+  };
+});
+$('tk').addEventListener('input', function () { stop(); C.k = +$('tk').value; update(); });
+$('bk').onclick = function () { stop(); C.k--; update(); };
+$('fw').onclick = function () { stop(); C.k++; update(); };
+$('nx').onclick = function () {
+  stop();
+  var pts = [0, 3, 5, 7, 8, 9, 10], b;
+  if (R.mode === 'frame') for (b = 1; b < R.n; b++) pts.push(16 * b + 8, 16 * b + 9, 16 * b + 10);
+  var nxt = pts.filter(function (p) { return p > C.k; })[0];
+  C.k = nxt === undefined ? R.kmax : nxt; update();
+};
+$('play').onclick = function () {
+  if (C.timer) { stop(); return; }
+  if (C.k >= R.kmax) C.k = KMIN;
+  $('play').textContent = 'Pause';
+  C.timer = setInterval(function () { C.k++; if (C.k >= R.kmax) { C.k = R.kmax; stop(); } update(); }, 70);
+};
+document.addEventListener('keydown', function (e) {
+  var t = e.target.tagName; if (t === 'INPUT' || t === 'SELECT') return;
+  var r = $('grid').getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return;
+  if (e.key === 'ArrowRight') $('fw').click(); if (e.key === 'ArrowLeft') $('bk').click();
+});
+Split.init({ grid: $('grid'), handle: $('rz'), key: 'frameTicksSide', def: 340, min: 280, rest: 420 });
+$('iwv').textContent = $('iw').value + ' ticks';
+fillBits(); baudInfo(); rebuild();
+</script>
+</body>
+</html>

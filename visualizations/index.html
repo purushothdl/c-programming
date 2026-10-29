@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firmware lessons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+.group { margin-top: 40px; }
+.group h2 { display: flex; align-items: baseline; gap: 12px; }
+.group h2 span { font: 400 12px "JetBrains Mono", monospace; color: var(--ink-3); }
+.list { margin-top: 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 16px; border-top: 1px solid var(--line-2); text-decoration: none; color: inherit; }
+.item:first-child { border-top: 0; }
+.item:hover { background: var(--card-2); }
+.item b { font-weight: 500; font-size: 15px; }
+.item p { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; grid-column: 1; }
+.item .src { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); grid-column: 1; }
+.item .st { grid-row: 1 / span 3; grid-column: 2; align-self: center; font: 400 11px "JetBrains Mono", monospace; padding: 2px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-3); white-space: nowrap; }
+.item .st.new { color: var(--ember); border-color: color-mix(in srgb, var(--ember) 50%, transparent); }
+.todo { padding: 14px 16px; font-size: 13px; color: var(--ink-2); }
+.todo code { margin-right: 4px; }
+</style>
+</head>
+<body>
+<nav><div class="wrap"><a class="brand" href="index.html">Firmware lessons <span>STM32F446RE</span></a><button class="tg" id="theme"></button></div></nav>
+
+<main class="wrap">
+<header style="padding:56px 0 8px">
+  <div class="eyebrow">visualizations/</div>
+  <h1 style="margin-top:14px">Step through the code. <em>Change a number, see what breaks.</em></h1>
+  <p class="serif" style="margin-top:16px;max-width:30em">One page per program or peripheral. Every page follows the shared design and is built from the real source lines and the manuals.</p>
+</header>
+
+<section class="group">
+  <h2>UART <span>uart/</span></h2>
+  <div class="list">
+    <a class="item" href="uart/ring-buffer.html"><b>Ring buffer</b><p>Type letters and watch the interrupt fill the ring. Switch between a realistic and a busy main. Drag a slider to see why head &amp; 7 finds the slot.</p><span class="src">programs/uart_echo_irq.c</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/cli-tx.html"><b>TX interrupt</b><p>Send "hi" and watch TXEIE arm and disarm. Four tabs, two of them bugs. A calculator shows when main has to wait.</p><span class="src">lib/uart.c</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/cli-numbers.html"><b>Print and parse</b><p>Type your own input and step through print_dec32, print_hex32, parse_u32 and tokenize line by line.</p><span class="src">lib/fmt.c</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/clock-drift.html"><b>Clock error</b><p>Which baud rates fit the error budget at 16 MHz. Drag the clock error and see where the samples land in a frame.</p><span class="src">lib/uart.c · RM0390 §25.4</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/frame-ticks.html"><b>Receiver, tick by tick</b><p>16 ticks per bit and a 3-sample vote. Add a flipped bit or a short glitch, or a low pulse on an idle line, and see which flag it sets (NF, FE, PE).</p><span class="src">RM0390 §25.4.3 · concept</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
+  <h2>Timers <span>tim/</span></h2>
+  <div class="list">
+    <a class="item" href="tim/capture.html"><b>TIM5 input capture</b><p>Five event sequences (two of them bugs), a debounce tuning lab, and a register builder for CCMR1 and CCER.</p><span class="src">programs/tim_capture/main.c</span><span class="st new">new style</span></a>
+    <a class="item" href="tim/channels.html"><b>Timer channel path</b><p>Follow one channel from counter to pin through its four gates. Cut one, flip one, and see all four pins on one analyser. Build CCMR1 and CCER and work out period and duty.</p><span class="src">programs/tim_pwm · lib/pwm.c</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
+  <h2>SPI <span>spi/</span></h2>
+  <div class="list">
+    <a class="item" href="spi/explorer.html"><b>SPI modes</b><p>Run a transfer in any of the four modes, give the slave the wrong CPHA to break it, and build the matching SPI_CR1 value with the clock speed.</p><span class="src">RM0390 ch. 26 · concept</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
+  <h2>Not built yet</h2>
+  <div class="list"><div class="todo"><code>button_irq</code><code>systick_irq</code><code>tim_pwm_fade</code><code>uart_echo_poll</code> have no page. <code>uart_echo_poll</code> would pair with the ring buffer page as "why we need the ring".</div></div>
+</section>
+
+<footer>Shared files: shared/style.css · theme.js · split.js · seq.js. See .claude/skills/visualize-concept/ to add a page.</footer>
+</main>
+<script src="shared/theme.js"></script>
+</body>
+</html>

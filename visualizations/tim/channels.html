@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer channel to pin, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.pc-top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: var(--card-2); overflow-x: auto; }
+.pc-top .sp { flex: 1; }
+.pc-top .pc-ctl { display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.pc-top .pc-ctl input[type=range] { width: 90px; }
+.pc-body { padding: 14px; display: grid; gap: 14px; }
+.pc-head { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink-3); }
+.pc-head b { font: 500 13px "JetBrains Mono", monospace; color: var(--ink); }
+.pc-head .stp { display: inline-flex; align-items: center; gap: 4px; }
+.pc-head .stp button { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink); cursor: pointer; font: 500 14px "JetBrains Mono", monospace; }
+.pc-head .stp button:hover { border-color: var(--ink-3); }
+.pc-head .stp b { min-width: 28px; text-align: center; color: var(--ember); }
+.pc-strip { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; }
+.pc-cell { height: 30px; border: 1px solid var(--line-2); border-radius: 3px; background: var(--card); color: var(--ink-3); font: 400 10.5px "JetBrains Mono", monospace; padding: 0; cursor: pointer; position: relative; min-width: 0; }
+.pc-cell:hover { border-color: var(--ink-3); }
+.pc-cell.low { background: color-mix(in srgb, var(--ink) 9%, var(--card)); color: var(--ink-2); }
+.pc-cell.now { outline: 2px solid var(--ember); outline-offset: 1px; color: var(--ink); z-index: 1; }
+.pc-cell.mark::after { content: ""; position: absolute; left: -2px; top: -5px; bottom: -5px; width: 2px; background: var(--ink); }
+.pc-cell.pend { border-style: dashed; border-color: var(--ember); }
+.pc-key { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--ink-3); margin-top: -6px; }
+.pc-key i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; }
+.pipe { display: grid; grid-template-columns: 1.35fr 22px 1fr 22px 1fr 22px 1fr; align-items: stretch; }
+.pc-wire { align-self: center; height: 2px; background: var(--line); transition: background .08s; }
+.pc-wire.hi { background: var(--ember); }
+.blk { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.blk .t { font: 400 10.5px "JetBrains Mono", monospace; color: var(--ink-3); }
+.blk .t b { color: var(--ember); font-weight: 500; }
+.blk .v { margin-top: auto; font: 400 11.5px "JetBrains Mono", monospace; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.blk .v i { display: inline-block; min-width: 18px; text-align: center; padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; font-style: normal; font-weight: 500; color: var(--ink-3); }
+.blk .v i.one { background: var(--ember); border-color: var(--ember); color: var(--bg); }
+.mch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.mch button { font: 400 11.5px "Inter", sans-serif; padding: 5px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink-2); cursor: pointer; line-height: 1.25; }
+.mch button small { display: block; font: 400 10px "JetBrains Mono", monospace; color: var(--ink-3); }
+.mch button:hover { border-color: var(--ink-3); }
+.mch button[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.mch button[aria-pressed="true"] small { color: color-mix(in srgb, var(--btn-ink) 65%, transparent); }
+.blk .seg { align-self: flex-start; }
+.pinbig { font: 400 30px/1 "Inter", sans-serif; letter-spacing: -.025em; }
+.pinbig small { font-size: 12px; color: var(--ink-3); letter-spacing: 0; margin-left: 4px; }
+.pc-say { font-size: 12.5px; color: var(--ink-2); padding: 9px 12px; border: 1px solid var(--line-2); background: var(--card-2); border-radius: 4px; }
+.pc-say b { color: var(--ink); font-weight: 500; }
+.pc-try { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 11px; color: var(--ink-3); }
+.inl.nm input { width: 84px; }
+.pc-an { border-top: 1px solid var(--line-2); padding: 12px 14px 14px; }
+.pc-an canvas { width: 100%; height: 210px; display: block; }
+.pc-an p { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-3); }
+@media (max-width: 860px) {
+  .pipe { grid-template-columns: 1fr; }
+  .pc-wire { width: 2px; height: 18px; justify-self: center; }
+}
+@media (max-width: 560px) { .pc-cell { font-size: 9px; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">Channels <span>counter to pin</span></a>
+    <a class="l" href="#path">Path</a>
+    <a class="l" href="#numbers">Numbers</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/tim_pwm · lib/pwm.c</div>
+    <h1 style="margin-top:14px">A timer makes a pin wave. <em>Four gates sit between them.</em></h1>
+    <p class="serif">The counter runs on its own. Each channel compares it with one number, turns the answer into a level, optionally flips it, and then either connects it to the pin or not. Change one gate and watch where the wave changes.</p>
+    <div class="cta"><a class="btn dark" href="#path">Follow a channel →</a><a class="btn" href="#numbers">Build the registers</a></div>
+  </div>
+  <div class="spec">
+    <div><span>Timer clock (HSI)</span><b>16 MHz</b></div>
+    <div><span>PSC · tick</span><b>15 · 1 µs</b></div>
+    <div><span>ARR · period</span><b>999 · 1 ms (1 kHz)</b></div>
+    <div><span>Duty</span><b>CCR1 / 1000</b></div>
+    <div><span>Mode</span><b>OC1M = 110 (PWM 1)</b></div>
+    <div><span>Pin</span><b>PA5 · AF1 · TIM2_CH1</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>Counter</b><span>CNT counts 0 to ARR, then wraps</span></div>
+  <div class="s hw"><i>HW 2</i><b>Compare</b><span>is CNT below CCRx?</span></div>
+  <div class="s hw"><i>HW 3</i><b>Rule</b><span>OCxM turns that into OCxREF</span></div>
+  <div class="s hw"><i>HW 4</i><b>Polarity</b><span>CCxP flips OCxREF or not</span></div>
+  <div class="s hw"><i>HW 5</i><b>Enable</b><span>CCxE connects it to the pin</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, runs without code. Your C only sets the registers once and later writes CCRx.</div>
+
+<section id="path">
+  <div class="sh"><div class="eyebrow">01 · counter to pin</div><h2>One channel, gate by gate</h2>
+    <p>Click a tick to set the compare value, pick a rule, flip polarity, cut the enable. The analyser shows all four pins on one counter. Buttons at the bottom load the usual mistakes.</p></div>
+  <div class="win" id="stage">
+    <div class="pc-top">
+      <button class="tab" role="tab" data-n="1" aria-selected="true">CH1</button>
+      <button class="tab" role="tab" data-n="2" aria-selected="false">CH2</button>
+      <button class="tab" role="tab" data-n="3" aria-selected="false">CH3</button>
+      <button class="tab" role="tab" data-n="4" aria-selected="false">CH4</button>
+      <span class="sp"></span>
+      <span class="pc-ctl"><label>speed <input id="spd" type="range" min="1" max="12" value="4"></label><button class="sheet-tg" id="play" aria-pressed="true">Pause</button></span>
+    </div>
+    <div class="pc-body">
+      <div class="pc-head">
+        <span>counter <b id="cnt">0</b> <span>(counts 0 to 19 here; the program counts 0 to 999)</span></span>
+        <span>compare value <span class="stp"><button id="dec" aria-label="decrease CCR">−</button><b id="ccrv">10</b><button id="inc" aria-label="increase CCR">+</button></span> <span class="mono" id="ccrname">CCR1</span></span>
+        <span>preload <span class="seg" id="pe"><button data-v="1" aria-pressed="true">on</button><button data-v="0" aria-pressed="false">off</button></span> <span class="mono" id="pename">OC1PE</span></span>
+      </div>
+      <div class="pc-strip" id="strip" role="group" aria-label="Counter ticks 0 to 19. Click a tick to set the compare value."></div>
+      <div class="pc-key"><span><i style="background:color-mix(in srgb,var(--ink) 9%,var(--card));border:1px solid var(--line-2)"></i>CNT below CCR</span><span><i style="background:var(--ink)"></i>CCR in use</span><span><i style="border:1px dashed var(--ember)"></i>CCR written, waiting for the wrap</span><span><i style="outline:2px solid var(--ember);outline-offset:-1px"></i>counter now</span></div>
+
+      <div class="pipe">
+        <div class="blk">
+          <span class="t"><b id="t_rule">OC1M</b> · <span id="t_ccmr">CCMR1</span> · the rule</span>
+          <div class="mch" id="chips"></div>
+          <span class="v"><span>OC<span id="n1">1</span>REF</span> <i id="vref">0</i></span>
+        </div>
+        <div class="pc-wire" id="w1"></div>
+        <div class="blk">
+          <span class="t"><b id="t_p">CC1P</b> · CCER · polarity</span>
+          <span class="seg" id="pol"><button data-v="0" aria-pressed="true">keep</button><button data-v="1" aria-pressed="false">flip</button></span>
+          <span class="v">after <i id="vpol">0</i></span>
+        </div>
+        <div class="pc-wire" id="w2"></div>
+        <div class="blk">
+          <span class="t"><b id="t_e">CC1E</b> · CCER · enable</span>
+          <span class="seg" id="en"><button data-v="1" aria-pressed="true">connected</button><button data-v="0" aria-pressed="false">cut</button></span>
+          <span class="v">to pin <i id="ven">0</i></span>
+        </div>
+        <div class="pc-wire" id="w3"></div>
+        <div class="blk">
+          <span class="t">PA5 pin · high for</span>
+          <span class="pinbig" id="pct">50%</span>
+          <span class="v" id="from">rule says 50%</span>
+        </div>
+      </div>
+      <div class="pc-say" id="say"></div>
+      <div class="pc-try" id="try"></div>
+    </div>
+    <div class="pc-an">
+      <canvas id="an" aria-label="Pin signals of all four channels over time"></canvas>
+      <p>Same counter, four pins. The selected channel is drawn heavy and also shows its OCREF (dashed) before polarity and enable.</p>
+    </div>
+  </div>
+</section>
+
+<section id="numbers">
+  <div class="sh"><div class="eyebrow">02 · the numbers</div><h2>Registers and period</h2>
+    <p>Click bits to build what <code>pwm_init()</code> writes for channel 1. Bit positions are from the F446 SVD; the OCxM table is RM0390 §17.4.7 (p. 558).</p></div>
+  <div class="two">
+    <div class="card">
+      <h3>TIM2-&gt;CCMR1 <span>0x40000018 · output mode</span></h3>
+      <div class="f-names"><div style="grid-column: span 1">OC1CE</div><div class="g3" style="grid-column: span 3">OC1M [6:4]</div><div class="g2">OC1PE</div><div>OC1FE</div><div class="g1" style="grid-column: span 2">CC1S</div></div>
+      <div class="bits"><div class="row" id="b-ccmr"></div></div>
+      <div class="out" id="o-ccmr"></div>
+      <div class="kv" id="kv-ccmr"></div>
+      <div class="warnbox" id="w-s">CC1S is not 00, so channel 1 is an input (capture). OC1M has no effect.</div>
+      <div class="warnbox" id="w-pe">Preload is off. A new CCR1 takes effect at once, in the middle of a period.</div>
+      <hr style="border:0;border-top:1px solid var(--line-2);margin:14px 0">
+      <h3>TIM2-&gt;CCER <span>0x40000020</span></h3>
+      <div class="f-names"><div class="g1">CC1P</div><div class="g1">CC1E</div></div>
+      <div class="bits"><div class="row" id="b-ccer" style="grid-auto-columns: minmax(0, 1fr)"></div></div>
+      <div class="out" id="o-ccer"></div>
+      <div class="kv" id="kv-ccer"></div>
+      <div class="warnbox" id="w-e">CC1E is 0: the timer does not drive the pin. Per RM0390 Table 113, OC1 reads 0 then.</div>
+      <div style="margin-top:12px"><button class="btn sm" id="load">Load the program's values</button></div>
+    </div>
+    <div class="card">
+      <h3>Period and duty <span>fCK = 16 MHz</span></h3>
+      <div class="inl nm">PSC <input type="number" id="psc" value="15" min="0" max="65535"> ARR <input type="number" id="arr" value="999" min="0" max="65535"> CCR1 <input type="number" id="ccr" value="500" min="0" max="65535"></div>
+      <div class="inl"><button class="btn sm ghost" id="pg">The program</button><button class="btn sm ghost" id="p1hz">1 Hz blink (PSC 15999)</button></div>
+      <div class="big" id="freq"></div>
+      <div class="kv" id="kv-calc"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><div class="eyebrow">03 · init order</div><h2>pwm_init(), in order</h2></div>
+  <ol class="order">
+    <li><b>PA5 to AF1</b><span>GPIOA clock, MODER5 = 10, AFSEL5 = 1 (datasheet Table 11) · lib/pwm.c 20-25</span></li>
+    <li><b>TIM2 clock, debug freeze</b><span>APB1ENR.TIM2EN, DBGMCU stops TIM2 while the core is halted · 31-32</span></li>
+    <li><b>PSC, ARR, CCR1</b><span>PSC = 15, ARR = 999, CCR1 = duty. All preloaded: they reach the live registers only at an update event · 37-39</span></li>
+    <li><b>Rule and preload</b><span>CCMR1: CC1S = 00, OC1M = 110, OC1PE = 1 · 43-44</span></li>
+    <li><b>Polarity, then enable</b><span>CCER: CC1P = 0, then CC1E = 1 · 47-48</span></li>
+    <li><b>ARPE</b><span>CR1.ARPE = 1: a new ARR also waits for the wrap · 50</span></li>
+    <li class="key"><b>EGR.UG: force an update</b><span>Highlighted for its reason: without it the counter starts with the reset PSC and ARR and keeps them until its first wrap · 52-54</span></li>
+    <li><b>CEN</b><span>CR1.CEN = 1, the counter starts · 56</span></li>
+  </ol>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">04 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>CCR above ARR holds the output high</b>In PWM 1, CNT is always below CCR, so OCxREF never falls (RM0390 §17.3.9; comment at lib/pwm.c 61). CCR = 0 holds it low.</div>
+    <div><b>Flipped polarity flips the duty</b>With CCxP = 1 a 25 % setting gives 75 % at the pin. PWM 2 gives the same wave as PWM 1 with a flip.</div>
+    <div><b>CCxE = 0 gives a silent pin</b>The counter and the compare keep running and OCxREF still moves. Only the gate to the pin is shut.</div>
+    <div><b>Without preload the duty changes mid-period</b>With OCxPE = 0 a CCR write is used at once and the current pulse comes out short or long. With it, the new value waits for the wrap.</div>
+    <div><b>PSC, ARR and CCR writes are not live yet</b>With preload they wait for an update event. That is why the init forces one with UG before starting.</div>
+    <div><b>CC1S must be 00</b>CC1S chooses input or output. Output needs 00, and the code clears it before setting OC1M.</div>
+  </div>
+</section>
+
+<footer>Source: lib/pwm.c 20-62, programs/tim_pwm/main.c · RM0390 §17.3.9 PWM mode (p. 531), §17.4.7 CCMR1 (p. 558), §17.4.9 CCER and Table 113 (p. 562) · SVD TIM2 CCMR1_Output, CCER</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var N = 20, WIN = 40;
+  var MODES = [['110', 'PWM 1'], ['111', 'PWM 2'], ['100', 'force low'], ['101', 'force high']];
+  function mk(ccr, e, p) { return { ccr: ccr, live: ccr, mode: '110', e: e, p: p, pe: 1 }; }
+  var chans = [mk(10, 1, 0), mk(5, 1, 0), mk(15, 1, 1), mk(10, 0, 0)];
+  var sel = 0;
+
+  /* model: one channel at one counter value k (RM0390 17.3.9, 17.4.7 OCxM, Table 113 CCxE) */
+  var ref = function (c, k) { return c.mode === '110' ? +(k < c.live) : c.mode === '111' ? +!(k < c.live) : c.mode === '101' ? 1 : 0; };
+  var pin = function (c, k) { return c.e ? ref(c, k) ^ c.p : 0; };
+  var count = function (c, f) { var n = 0; for (var k = 0; k < N; k++) n += f(c, k); return n; };
+  var setCcr = function (c, v) { c.ccr = Math.max(0, Math.min(N, v)); if (!c.pe) c.live = c.ccr; };
+
+  $('#strip').innerHTML = Array.from({ length: N }, function (_, k) { return '<button class="pc-cell" data-k="' + k + '">' + k + '</button>'; }).join('');
+  $('#chips').innerHTML = MODES.map(function (m) { return '<button data-v="' + m[0] + '">' + m[1] + '<small>' + m[0] + '</small></button>'; }).join('');
+  var cells = Array.prototype.slice.call(document.querySelectorAll('.pc-cell'));
+  var press = function (host, v) { Array.prototype.forEach.call(host.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.v) === String(v)); }); };
+
+  function sayText(c, n) {
+    var out = [], ref0 = count(c, ref), pn = count(c, pin);
+    if (c.mode === '110' || c.mode === '111') {
+      var hi = c.mode === '110' ? 'below' : 'at or above';
+      out.push('<b>' + (c.mode === '110' ? 'PWM 1' : 'PWM 2') + ':</b> OC' + n + 'REF is high while the counter is ' + hi + ' CCR' + n + ' (' + ref0 + ' of ' + N + ' ticks).');
+      if (c.live === 0 && c.mode === '110') out.push('CCR = 0 holds it low.');
+      if (c.live >= N && c.mode === '110') out.push('CCR above ARR holds it high.');
+    } else out.push('<b>Forced:</b> the compare is ignored, OC' + n + 'REF is held ' + (c.mode === '101' ? 'high' : 'low') + '.');
+    if (c.p) out.push('Polarity flipped: the pin is the opposite of OC' + n + 'REF.');
+    if (!c.e) out.push('<b>CC' + n + 'E = 0: the pin stays low</b> whatever the rule says.');
+    else out.push('Pin is high ' + pn + ' of ' + N + ' ticks.');
+    return out.join(' ');
+  }
+
+  function render() {
+    var c = chans[sel], n = sel + 1;
+    Array.prototype.forEach.call(document.querySelectorAll('.pc-top .tab'), function (b) { b.setAttribute('aria-selected', +b.dataset.n === n); });
+    $('#ccrv').textContent = c.ccr; $('#ccrname').textContent = 'CCR' + n; $('#pename').textContent = 'OC' + n + 'PE';
+    $('#t_rule').textContent = 'OC' + n + 'M'; $('#t_ccmr').textContent = n < 3 ? 'CCMR1' : 'CCMR2'; $('#n1').textContent = n;
+    $('#t_p').textContent = 'CC' + n + 'P'; $('#t_e').textContent = 'CC' + n + 'E';
+    press($('#chips'), c.mode); press($('#pol'), c.p); press($('#en'), c.e); press($('#pe'), c.pe);
+    var rd = Math.round(count(c, ref) / N * 100), pd = Math.round(count(c, pin) / N * 100);
+    $('#pct').textContent = pd + '%';
+    $('#from').textContent = pd === rd ? 'rule says ' + rd + '%' : 'rule said ' + rd + '%';
+    cells.forEach(function (el, k) {
+      el.classList.toggle('low', c.mode === '110' ? k < c.live : c.mode === '111' ? k >= c.live : false);
+      el.classList.toggle('mark', k === c.live);
+      el.classList.toggle('pend', c.live !== c.ccr && k === c.ccr);
+    });
+    $('#say').innerHTML = sayText(c, n);
+    var tr = $('#try');
+    tr.innerHTML = '<span>Try on CH' + n + ':</span>' + [
+      ['program', "The program's setup"], ['nocc', 'Forget CC' + n + 'E'], ['above', 'CCR above ARR'], ['zero', 'CCR = 0'], ['flip', 'Flip polarity (CCR 5)'], ['nope', 'Preload off, then move CCR']
+    ].map(function (b) { return '<button class="btn sm ghost" data-t="' + b[0] + '">' + b[1] + '</button>'; }).join('');
+  }
+
+  var put = function (c, v) { setCcr(c, v); c.live = c.ccr; };   /* presets take effect at once so the page shows their result */
+  var TRY = {
+    program: function (c) { c.mode = '110'; c.p = 0; c.e = 1; c.pe = 1; put(c, 10); },
+    nocc: function (c) { c.e = 0; },
+    above: function (c) { c.mode = '110'; put(c, N); },
+    zero: function (c) { c.mode = '110'; put(c, 0); },
+    flip: function (c) { c.p = 1; c.mode = '110'; put(c, 5); },
+    nope: function (c) { c.pe = 0; c.live = c.ccr; }
+  };
+  $('#try').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; TRY[b.dataset.t](chans[sel]); render(); };
+  Array.prototype.forEach.call(document.querySelectorAll('.pc-top .tab'), function (b) { b.onclick = function () { sel = +b.dataset.n - 1; render(); }; });
+  $('#chips').onclick = function (e) { var b = e.target.closest('button'); if (b) { chans[sel].mode = b.dataset.v; render(); } };
+  $('#pol').onclick = function (e) { var b = e.target.closest('button'); if (b) { chans[sel].p = +b.dataset.v; render(); } };
+  $('#en').onclick = function (e) { var b = e.target.closest('button'); if (b) { chans[sel].e = +b.dataset.v; render(); } };
+  $('#pe').onclick = function (e) { var b = e.target.closest('button'); if (b) { var c = chans[sel]; c.pe = +b.dataset.v; if (!c.pe) c.live = c.ccr; render(); } };
+  cells.forEach(function (el) { el.onclick = function () { setCcr(chans[sel], +el.dataset.k); render(); }; });
+  $('#dec').onclick = function () { var c = chans[sel]; setCcr(c, c.ccr - 1); render(); };
+  $('#inc').onclick = function () { var c = chans[sel]; setCcr(c, c.ccr + 1); render(); };
+  var playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var syncPlay = function () { $('#play').setAttribute('aria-pressed', playing); $('#play').textContent = playing ? 'Pause' : 'Play'; };
+  $('#play').onclick = function () { playing = !playing; syncPlay(); }; syncPlay();
+
+  /* time and history: each tick records what the pins were doing with the settings then in force */
+  var hist = {};
+  function snap(T) {
+    var k = ((T % N) + N) % N;
+    if (k === 0) chans.forEach(function (c) { c.live = c.ccr; });   /* update event: preloaded CCR goes live */
+    hist[T] = { pin: chans.map(function (c) { return pin(c, k); }), raw: chans.map(function (c) { return ref(c, k); }) };
+    delete hist[T - WIN - 5];
+  }
+  for (var j = -WIN; j < 0; j++) { var kk = ((j % N) + N) % N; hist[j] = { pin: chans.map(function (c) { return pin(c, kk); }), raw: chans.map(function (c) { return ref(c, kk); }) }; }
+  var t = 0, lastT = -1, last = performance.now();
+  var canvas = $('#an'), ctx = canvas.getContext('2d');
+  function fit() { var r = devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight; canvas.width = w * r; canvas.height = h * r; ctx.setTransform(r, 0, 0, r, 0, 0); }
+  addEventListener('resize', fit); fit();
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(canvas.parentElement);
+
+  function draw() {
+    var W = canvas.clientWidth, H = canvas.clientHeight, cs = getComputedStyle(document.documentElement);
+    var v = function (k) { return cs.getPropertyValue(k).trim(); };
+    var ink = v('--ink'), ink3 = v('--ink-3'), ember = v('--ember'), line = v('--line'), ink2 = v('--ink-2');
+    ctx.clearRect(0, 0, W, H);
+    var left = 64, pw = W - left - 8, rows = 5, rh = H / rows, T = Math.floor(t);
+    var X = function (j) { return left + pw * (1 - (t - j) / WIN); };
+    ctx.font = '400 11px JetBrains Mono, monospace'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    for (var j = Math.ceil(t - WIN); j <= T; j++) if (((j % N) + N) % N === 0) { var x = X(j); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    ctx.setLineDash([]);
+    function trace(row, color, get, w, dash) {
+      var y0 = row * rh + rh * 0.78, y1 = row * rh + rh * 0.22;
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath();
+      var first = true, prev = null;
+      for (var j = Math.max(Math.floor(t - WIN), T - WIN); j <= T; j++) {
+        var h = hist[j]; if (!h) continue;
+        var xa = Math.max(left, X(j)), xb = Math.min(left + pw, j === T ? X(t) : X(j + 1)), y = get(h) ? y1 : y0;
+        if (first) { ctx.moveTo(xa, y); first = false; } else ctx.lineTo(xa, y);
+        ctx.lineTo(xb, y);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = ink3; ctx.fillText('OC' + (sel + 1) + 'REF', 4, rh * 0.5);
+    trace(0, ember, function (h) { return h.raw[sel]; }, 1.4, [4, 4]);
+    for (var i = 0; i < 4; i++) {
+      var active = i === sel;
+      ctx.fillStyle = active ? ember : ink3; ctx.fillText('CH' + (i + 1) + ' pin', 4, (i + 1) * rh + rh * 0.5);
+      trace(i + 1, active ? ember : ink3, (function (i) { return function (h) { return h.pin[i]; }; })(i), active ? 2.4 : 1.4);
+    }
+    ctx.strokeStyle = ink2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left + pw, 0); ctx.lineTo(left + pw, H); ctx.stroke();
+  }
+
+  function frame(now) {
+    var dt = Math.min(.25, (now - last) / 1000); last = now;
+    if (playing) t += dt * $('#spd').value;
+    var T = Math.floor(t), pendingRender = false;
+    while (lastT < T) { lastT++; var before = chans.map(function (c) { return c.live; }); snap(lastT); if (chans.some(function (c, i) { return c.live !== before[i]; })) pendingRender = true; }
+    var k = ((T % N) + N) % N, c = chans[sel];
+    cells.forEach(function (el, i) { el.classList.toggle('now', i === k); });
+    $('#cnt').textContent = k;
+    if (pendingRender) render();
+    var r = ref(c, k), a = r ^ c.p, p = pin(c, k);
+    var one = function (id, val) { $(id).textContent = val; $(id).classList.toggle('one', !!val); };
+    one('#vref', r); one('#vpol', a); one('#ven', p);
+    $('#w1').classList.toggle('hi', !!r); $('#w2').classList.toggle('hi', !!a); $('#w3').classList.toggle('hi', !!p);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  render(); requestAnimationFrame(frame);
+})();
+
+/* ---------- registers (bit positions: SVD TIM2 CCMR1_Output, CCER; OCxM table: RM0390 17.4.7) ---------- */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var ccmr = 0, ccer = 0;
+  var hex = function (v, w) { return '0x' + v.toString(16).toUpperCase().padStart(w, '0'); };
+  var OCM = ['frozen (no effect)', 'set active on match', 'set inactive on match', 'toggle on match', 'force inactive (low)', 'force active (high)', 'PWM mode 1', 'PWM mode 2'];
+  function makeBits(id, bits, getV, toggle) {
+    var c = $(id); c.textContent = '';
+    bits.forEach(function (b) {
+      var d = document.createElement('div'), on = (getV() >> b) & 1;
+      d.className = 'bit' + (on ? ' on' : ''); d.innerHTML = on + '<small>' + b + '</small>';
+      d.tabIndex = 0; d.setAttribute('role', 'switch'); d.setAttribute('aria-checked', on ? 'true' : 'false');
+      d.onclick = function () { toggle(b); };
+      d.onkeydown = function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(b); } };
+      c.appendChild(d);
+    });
+  }
+  function kv(id, rows) { $(id).innerHTML = rows.map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join(''); }
+  function render() {
+    makeBits('b-ccmr', [7, 6, 5, 4, 3, 2, 1, 0], function () { return ccmr; }, function (b) { ccmr ^= 1 << b; render(); });
+    makeBits('b-ccer', [1, 0], function () { return ccer; }, function (b) { ccer ^= 1 << b; render(); });
+    $('o-ccmr').innerHTML = 'TIM2-&gt;CCMR1 = <span>' + hex(ccmr, 2) + '</span>';
+    $('o-ccer').innerHTML = 'TIM2-&gt;CCER = <span>' + hex(ccer, 2) + '</span>';
+    var s = ccmr & 3, pe = (ccmr >> 3) & 1, m = (ccmr >> 4) & 7;
+    kv('kv-ccmr', [['CC1S', s === 0 ? '00 output' : ['', '01 input TI1', '10 input TI2', '11 input TRC'][s]], ['OC1M = ' + m.toString(2).padStart(3, '0'), OCM[m]], ['OC1PE', pe ? 'preload on: new CCR1 at the next wrap' : 'preload off: new CCR1 at once']]);
+    var p = (ccer >> 1) & 1, e = ccer & 1;
+    kv('kv-ccer', [['CC1P', p ? '1 · flipped (active low)' : '0 · active high'], ['CC1E', e ? '1 · OC1 drives the pin' : '0 · pin not driven']]);
+    $('w-s').className = 'warnbox' + (s !== 0 ? ' show' : '');
+    $('w-pe').className = 'warnbox' + (s === 0 && !pe && (m === 6 || m === 7) ? ' show' : '');
+    $('w-e').className = 'warnbox' + (!e ? ' show' : '');
+  }
+  $('load').onclick = function () { ccmr = 0x68; ccer = 0x01; render(); };   /* OC1M_2 | OC1M_1 | OC1PE ; CC1E */
+  $('load').click();
+
+  function human(sec) {
+    if (sec < 1e-3) return (sec * 1e6).toPrecision(3).replace(/\.?0+$/, '') + ' µs';
+    if (sec < 1) return (sec * 1e3).toPrecision(4).replace(/\.?0+$/, '') + ' ms';
+    return sec.toPrecision(4).replace(/\.?0+$/, '') + ' s';
+  }
+  function calc() {
+    var psc = Math.max(0, +$('psc').value || 0), arr = Math.max(0, +$('arr').value || 0), ccr = Math.max(0, +$('ccr').value || 0);
+    var tick = (psc + 1) / 16e6, period = (arr + 1) * tick, f = 1 / period;
+    var duty = ccr > arr ? 1 : ccr / (arr + 1);
+    $('freq').innerHTML = (f >= 1e3 ? (f / 1e3).toPrecision(4).replace(/\.?0+$/, '') + ' <small>kHz</small>' : f.toPrecision(4).replace(/\.?0+$/, '') + ' <small>Hz</small>');
+    kv('kv-calc', [['Tick = (PSC+1) / 16 MHz', human(tick)], ['Period = (ARR+1) ticks', human(period)], ['Duty = CCR1 / (ARR+1)', (duty * 100).toPrecision(4).replace(/\.?0+$/, '') + ' %' + (ccr > arr ? ' (CCR above ARR: always high)' : '')], ['Steps of duty', (arr + 1) + ' (' + (100 / (arr + 1)).toPrecision(2) + ' % each)']]);
+  }
+  ['psc', 'arr', 'ccr'].forEach(function (id) { $(id).oninput = calc; });
+  $('pg').onclick = function () { $('psc').value = 15; $('arr').value = 999; $('ccr').value = 500; calc(); };
+  $('p1hz').onclick = function () { $('psc').value = 15999; $('arr').value = 999; $('ccr').value = 500; calc(); };
+  calc();
+})();
+</script>
+</body>
+</html>

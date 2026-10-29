@@ -32,7 +32,7 @@ Purushoth is learning bare-metal STM32F446RE. Past explanations failed when they
 
 ## Visualizations
 
-- Build one only when asked, as a single HTML file in `visualizations/`, matching the existing files.
+- Build one only when asked, as a single HTML file in `visualizations/`. Follow `.claude/skills/visualize-concept/SKILL.md`.
 - Show one path or one idea at a time. Avoid repeating the same row four times.
 - Let the reader change one input and see where the signal changes.
 

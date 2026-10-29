@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Template for a new lesson page. Copy to visualizations/<topic>/<name>.html, then replace every TODO.
+     Shared files live in ../shared/ (style.css, theme.js, split.js, seq.js). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TODO name, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<!-- Optional: <style>:root{--ember:#...} :root[data-theme=dark]{--ember:#...}</style> for a per-topic accent. -->
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">TODO file <span>TODO topic</span></a>
+    <a class="l" href="#sequence">Sequence</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+<header class="hero">
+  <div>
+    <div class="eyebrow">programs/TODO/main.c</div>
+    <h1 style="margin-top:14px">TODO sentence. <em>TODO the point.</em></h1>
+    <p class="serif">TODO two sentences, plain words.</p>
+    <div class="cta"><a class="btn dark" href="#sequence">TODO action →</a></div>
+  </div>
+  <div class="spec">
+    <div><span>TODO</span><b>TODO value</b></div>
+  </div>
+</header>
+
+<div class="flow">
+  <div class="s hw"><i>HW 1</i><b>TODO</b><span>TODO</span></div>
+  <div class="s"><i>CODE 2</i><b>TODO</b><span>TODO</span></div>
+</div>
+<div class="flow-key"><b>HW</b> = hardware, no code running · CODE = your C</div>
+
+<section id="sequence">
+  <div class="sh"><div class="eyebrow">01 · who talks to whom</div><h2>TODO</h2><p>TODO one or two lines.</p></div>
+  <div id="seq"></div>
+</section>
+
+<!-- More lessons: copy a lab from tim/capture.html (debounce lab, register builder, calculators)
+     or uart/clock-drift.html (budget table, frame model). Use .win > .lab for the frame. -->
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">02 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl"><div><b>TODO</b>TODO one sentence from a source comment or the manual.</div></div>
+</section>
+
+<footer>Source: TODO file and line ranges · RM0390 TODO section and page</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+Seq.mount(document.getElementById('seq'), {
+  file: 'TODO/main.c', key: 'todoSide',
+  lanes: [{ id: 'hw', t: 'Hardware', s: 'peripheral' }, { id: 'isr', t: 'ISR', s: 'TODO_IRQHandler' }, { id: 'main', t: 'main', s: 'for (;;)' }],
+  src: [[1, 'TODO real source lines; run the check script so the text matches the file exactly']],
+  scenarios: [
+    { id: 'clean', tab: 'clean.seq', init: { flag: 0 }, steps: [
+      { f: 'hw', t: 'isr', label: 'IRQ', kind: 'irq', title: 'TODO', desc: 'TODO', code: 'TODO', lines: [1], set: { flag: 1 } }
+    ] }
+  ]
+});
+</script>
+</body>
+</html>

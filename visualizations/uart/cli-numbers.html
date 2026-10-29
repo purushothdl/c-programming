@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLI print and parse, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.fnbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 12px; }
+.fnbar input[type=text] { width: 230px; font-size: 13px; padding: 6px 9px; }
+.fnbar .err { color: var(--bad); font-size: 12px; min-height: 1em; }
+.fnbar .grp { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">lib/fmt.c <span>print and parse</span></a>
+    <a class="l" href="#steps">Step through</a>
+    <a class="l" href="#why">Why two print functions</a>
+    <a class="l" href="#gotchas">Gotchas</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">lib/fmt.c · used by lib/cli.c</div>
+    <h1 style="margin-top:14px">No printf, no strtol. <em>Four small functions do the job.</em></h1>
+    <p class="serif">The CLI prints numbers, reads them, and splits a line into words. Each function is a few lines. Type your own input and step through the real code, one line at a time.</p>
+    <div class="cta">
+      <a class="btn dark" href="#steps">Try print_dec32 →</a>
+      <a class="btn" href="#steps">Break parse_u32</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>print_dec32</span><b>1234 → "1234"</b></div>
+    <div><span>print_hex32</span><b>255 → "0x000000FF"</b></div>
+    <div><span>parse_u32</span><b>"0x1F" → 31</b></div>
+    <div><span>tokenize</span><b>"peek 0x4002…" → 2 words</b></div>
+    <div><span>No heap, no libc</span><b>freestanding build</b></div>
+    <div><span>Used by</span><b>cmd_peek, cmd_poke, help</b></div>
+  </div>
+</header>
+
+<section id="steps">
+  <div class="sh"><div class="eyebrow">01 · step through the real code</div><h2>Pick a function, type an input</h2>
+    <p>Each arrow is one step of the C below it. Watch the values change in the panel. Faded arrows have not run yet.</p></div>
+  <div class="fnbar">
+    <span class="seg" id="fnseg">
+      <button data-f="dec" aria-pressed="true">print_dec32</button>
+      <button data-f="hex" aria-pressed="false">print_hex32</button>
+      <button data-f="parse" aria-pressed="false">parse_u32</button>
+      <button data-f="tok" aria-pressed="false">tokenize</button>
+    </span>
+    <div class="grp"><label for="inp">Input</label><input type="text" id="inp" autocomplete="off" spellcheck="false" maxlength="24"></div>
+    <span class="seg" id="presets"></span>
+    <span class="err" id="err"></span>
+  </div>
+  <div id="seq"></div>
+</section>
+
+<section id="why">
+  <div class="sh"><div class="eyebrow">02 · design</div><h2>Is uart_puts redundant?</h2>
+    <p>No. <code>uart_puts(s)</code> is a shortcut for <code>print_str(uart_putc, s)</code>. C's own library has the same pair.</p></div>
+  <div class="facts">
+    <div class="card"><h3>uart_puts(s) <span>like puts</span></h3>Send to the usual output. You do not choose where. The CLI calls it everywhere, so each call stays short.</div>
+    <div class="card"><h3>print_str(put, s) <span>like fputs</span></h3>Send to any output you pass in. The HardFault report needs this: it prints with <code>fault_putc</code>, which polls instead of using the interrupt.</div>
+  </div>
+  <div class="three">
+    <div class="card"><b>The same code, two outputs</b>print_dec32 and print_hex32 take the sink as a parameter. The normal path uses <code>uart_putc</code>, the fault path <code>fault_putc</code>.</div>
+    <div class="card"><b>Pure logic</b>fmt.c has no hardware access, so these functions can be tested on a PC.</div>
+    <div class="card"><b>The wrapper costs one call</b>It also hides which output is the normal one. Change that once, in uart_puts.</div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>Overflow is checked first</b>parse_u32 tests <code>v &gt; (0xFFFFFFFF − d) / base</code> before it multiplies. Checking after would be too late, the value has already wrapped.</div>
+    <div><b>*out is written only on success</b>On failure the caller's variable is untouched, so cmd_poke can fail on the second argument safely.</div>
+    <div><b>do-while prints 0</b>print_dec32 uses do-while so a value of 0 still gives one digit.</div>
+    <div><b>Digits come out backwards</b>v % 10 gives the last digit first, so the digits go into buf and print in reverse.</div>
+    <div><b>tokenize edits the line</b>It writes NUL bytes into the buffer. Words are valid only while that buffer is untouched.</div>
+    <div><b>Too many words</b>The CLI asks for one more word than it allows, so an extra word is noticed and reported as a usage error.</div>
+  </div>
+</section>
+
+<footer>Source: lib/fmt.c (lines 10–34, 36–69, 80–99), lib/cli.c · results are computed by replaying the same algorithm in JavaScript.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var FMT = [
+  "#include \"fmt.h\"",
+  "",
+  "void print_str(putc_fn put, const char *s)",
+  "{",
+  "    while (*s != '\\0') {",
+  "        put(*s++);",
+  "    }",
+  "}",
+  "",
+  "void print_hex32(putc_fn put, uint32_t v)",
+  "{",
+  "    static const char digits[] = \"0123456789ABCDEF\";",
+  "",
+  "    put('0');",
+  "    put('x');",
+  "    for (int shift = 28; shift >= 0; shift -= 4) {",
+  "        put(digits[(v >> shift) & 0xFu]);",
+  "    }",
+  "}",
+  "",
+  "void print_dec32(putc_fn put, uint32_t v)",
+  "{",
+  "    char buf[10];",
+  "    uint32_t n = 0u;",
+  "",
+  "    do {",
+  "        buf[n++] = (char)('0' + (v % 10u));",
+  "        v /= 10u;",
+  "    } while (v != 0u);",
+  "",
+  "    while (n != 0u) {",
+  "        put(buf[--n]);",
+  "    }",
+  "}",
+  "",
+  "static int hexval(char c)",
+  "{",
+  "    if (c >= '0' && c <= '9') return c - '0';",
+  "    if (c >= 'a' && c <= 'f') return c - 'a' + 10;",
+  "    if (c >= 'A' && c <= 'F') return c - 'A' + 10;",
+  "    return -1;",
+  "}",
+  "",
+  "int parse_u32(const char *s, uint32_t *out)",
+  "{",
+  "    uint32_t base = 10u;",
+  "    uint32_t v = 0u;",
+  "",
+  "    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {",
+  "        base = 16u;",
+  "        s += 2;",
+  "    }",
+  "    if (*s == '\\0') {",
+  "        return 0;",
+  "    }",
+  "",
+  "    for (; *s != '\\0'; s++) {",
+  "        int d = hexval(*s);",
+  "        if (d < 0 || (uint32_t)d >= base) {",
+  "            return 0;",
+  "        }",
+  "        if (v > (0xFFFFFFFFu - (uint32_t)d) / base) {",
+  "            return 0;                       /* would overflow */",
+  "        }",
+  "        v = v * base + (uint32_t)d;",
+  "    }",
+  "    *out = v;",
+  "    return 1;",
+  "}",
+  "",
+  "int streq(const char *a, const char *b)",
+  "{",
+  "    while (*a != '\\0' && *a == *b) {",
+  "        a++;",
+  "        b++;",
+  "    }",
+  "    return *a == *b;",
+  "}",
+  "",
+  "int tokenize(char *s, char *argv[], int max)",
+  "{",
+  "    int n = 0;",
+  "",
+  "    while (*s != '\\0' && n < max) {",
+  "        while (*s == ' ') {",
+  "            s++;",
+  "        }",
+  "        if (*s == '\\0') {",
+  "            break;",
+  "        }",
+  "        argv[n++] = s;",
+  "        while (*s != '\\0' && *s != ' ') {",
+  "            s++;",
+  "        }",
+  "        if (*s != '\\0') {",
+  "            *s++ = '\\0';",
+  "        }",
+  "    }",
+  "    return n;",
+  "}"
+];   /* lib/fmt.c, line n is FMT[n - 1] */
+
+(function () {
+  function src(a, b) {
+    var out = [];
+    for (var n = a; n <= b; n++) if (FMT[n - 1].trim() !== '') out.push([n, FMT[n - 1]]);
+    return out;
+  }
+  var HEX = '0123456789ABCDEF';
+  var hex8 = function (v) { var s = ''; for (var sh = 28; sh >= 0; sh -= 4) s += HEX[(v >>> sh) & 15]; return '0x' + s; };
+  function num(str) {                              /* decimal or 0x hex, 0 .. 2^32-1 */
+    var t = str.trim();
+    if (!/^(0x[0-9a-f]+|\d+)$/i.test(t)) return null;
+    var n = Number(t);
+    return (n >= 0 && n <= 0xFFFFFFFF) ? n : null;
+  }
+  var LANES = {
+    out: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_ticks' }, { id: 'fn', t: 'function', s: 'lib/fmt.c' }, { id: 'out', t: 'put()', s: 'uart_putc or fault_putc' }],
+    parse: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_poke' }, { id: 'fn', t: 'parse_u32', s: 'lib/fmt.c' }, { id: 'out', t: '*out', s: "caller's variable" }],
+    tok: [{ id: 'caller', t: 'caller', s: 'execute()' }, { id: 'fn', t: 'tokenize', s: 'lib/fmt.c' }, { id: 'out', t: 'argv[]', s: 'word pointers' }]
+  };
+
+  /* ----- print_dec32 (lines 21-34) ----- */
+  function decScen(v) {
+    var steps = [], x = v, n = 0, digits = '', out = '';
+    steps.push({ f: 'caller', t: 'fn', label: 'print_dec32(put, ' + v + ')', title: 'Print ' + v + ' in decimal', desc: 'The caller passes the output function and the value.', code: 'print_dec32(uart_putc, ' + v + ');', lines: [21] });
+    steps.push({ f: 'fn', t: 'fn', label: 'n = 0', title: 'Empty buffer', desc: 'buf holds up to 10 digits. 4294967295 has exactly 10.', code: 'char buf[10];\nuint32_t n = 0u;', lines: [23, 24], set: { v: v, n: 0, buf: '', out: '' } });
+    do {
+      var d = x % 10, nx = Math.floor(x / 10);
+      steps.push({ f: 'fn', t: 'fn', label: "buf[" + n + "] = '" + d + "'", title: 'Peel off the last digit', desc: x + ' % 10 = ' + d + ' goes in buf. Then v = ' + x + ' / 10 = ' + nx + '.', code: "buf[n++] = (char)('0' + (v % 10u));\nv /= 10u;", lines: [26, 27, 28, 29], set: { v: nx, n: n + 1, buf: digits + d } });
+      digits += d; n++; x = nx;
+    } while (x !== 0);
+    for (var i = n - 1; i >= 0; i--) {
+      out += digits[i];
+      steps.push({ f: 'fn', t: 'out', label: "put('" + digits[i] + "')", kind: 'good', title: 'Print from the end of buf', desc: 'The last digit was found first, so the loop reads buf backwards.', code: 'while (n != 0u) {\n  put(buf[--n]);\n}', lines: [31, 32], set: { n: i, out: out } });
+    }
+    steps[steps.length - 1].verdict = 'good';
+    steps[steps.length - 1].verdictText = 'Printed "' + out + '". do-while means 0 would still print one digit.';
+    return { id: 'dec', tab: 'print_dec32(' + v + ')', lanes: LANES.out, src: src(21, 34), init: { v: v, n: '—', buf: '', out: '' }, steps: steps };
+  }
+
+  /* ----- print_hex32 (lines 10-19) ----- */
+  function hexScen(v) {
+    var steps = [], out = '';
+    steps.push({ f: 'caller', t: 'fn', label: 'print_hex32(put, ' + v + ')', title: 'Print ' + v + ' in hex', desc: 'Always 8 digits, with a 0x prefix.', code: 'print_hex32(uart_putc, ' + v + ');', lines: [10] });
+    steps.push({ f: 'fn', t: 'out', label: "put('0')", title: 'Prefix', desc: 'The prefix is two fixed characters.', code: "put('0');", lines: [14], set: { out: '0' } });
+    steps.push({ f: 'fn', t: 'out', label: "put('x')", title: 'Prefix', desc: '', code: "put('x');", lines: [15], set: { out: '0x' } });
+    out = '0x';
+    for (var sh = 28; sh >= 0; sh -= 4) {
+      var nib = (v >>> sh) & 15; out += HEX[nib];
+      steps.push({ f: 'fn', t: 'out', label: "put('" + HEX[nib] + "')", kind: 'good', title: 'Nibble ' + (7 - sh / 4) + ' of 8', desc: '(v >> ' + sh + ') & 0xF = ' + nib + ', which is digit ' + HEX[nib] + '. Four bits per digit, so no division is needed.', code: 'put(digits[(v >> ' + sh + ') & 0xFu]);', lines: [16, 17], set: { shift: sh, nibble: nib, out: out } });
+    }
+    steps[steps.length - 1].verdict = 'good';
+    steps[steps.length - 1].verdictText = 'Printed ' + out + '.';
+    return { id: 'hex', tab: 'print_hex32(' + v + ')', lanes: LANES.out, src: src(10, 19), init: { shift: '—', nibble: '—', out: '' }, steps: steps };
+  }
+
+  /* ----- parse_u32 (lines 36-69) ----- */
+  function hexval(c) {
+    if (c >= '0' && c <= '9') return c.charCodeAt(0) - 48;
+    if (c >= 'a' && c <= 'f') return c.charCodeAt(0) - 87;
+    if (c >= 'A' && c <= 'F') return c.charCodeAt(0) - 55;
+    return -1;
+  }
+  var vs = function (v) { return v + ' (0x' + v.toString(16).toUpperCase() + ')'; };
+  function parseScen(str) {
+    var shown = '"' + str + '"', steps = [], base = 10, v = 0, p = 0, i, c, d;
+    steps.push({ f: 'caller', t: 'fn', label: 'parse_u32(' + shown + ')', title: 'Parse a word', desc: 'The caller passes the text and the address of its variable.', code: 'parse_u32(' + shown + ', &value)', lines: [44] });
+    steps.push({ f: 'fn', t: 'fn', label: 'base = 10, v = 0', title: 'Start as decimal', desc: 'Decimal unless the text starts with 0x.', code: 'uint32_t base = 10u;\nuint32_t v = 0u;', lines: [46, 47], set: { base: 10, v: '0 (0x0)', char: '—', result: 'unchanged' } });
+    if (str[0] === '0' && (str[1] === 'x' || str[1] === 'X')) {
+      base = 16; p = 2;
+      steps.push({ f: 'fn', t: 'fn', label: '0x prefix → base 16', title: 'Hex prefix found', desc: 'The prefix is skipped. The digits start after it.', code: 'if (s[0] == \'0\' && (s[1] == \'x\' || ...)) {\n  base = 16u;\n  s += 2;\n}', lines: [49, 50, 51], set: { base: 16 } });
+    } else {
+      steps.push({ f: 'fn', t: 'fn', label: 'no prefix', title: 'No 0x prefix', desc: 'The text is read as decimal.', code: 'if (s[0] == \'0\' && (s[1] == \'x\' ...)) { ... }', lines: [49] });
+    }
+    if (p >= str.length) {
+      steps.push({ f: 'fn', t: 'caller', label: 'return 0 (no digits)', kind: 'bad', title: 'Nothing to parse', desc: 'The text is empty, or only "0x". That is an error.', code: 'if (*s == \'\\0\') {\n  return 0;\n}', lines: [53, 54], set: { result: 'unchanged' }, verdict: 'bad', verdictText: 'Returned 0. *out was not written.' });
+      return { id: 'parse', tab: 'parse_u32(' + shown + ')', lanes: LANES.parse, src: src(36, 69), init: { base: '—', v: '—', char: '—', result: '—' }, steps: steps };
+    }
+    for (i = p; i < str.length; i++) {
+      c = str[i]; d = hexval(c);
+      if (d < 0 || d >= base) {
+        steps.push({ f: 'fn', t: 'caller', label: "'" + c + "' is not a base-" + base + ' digit → 0', kind: 'bad', title: 'Bad digit', desc: "hexval('" + c + "') = " + d + (d >= 0 ? ', which is not below the base ' + base : ', so it is not a digit at all') + '. The parse fails.', code: 'int d = hexval(*s);\nif (d < 0 || d >= base) {\n  return 0;\n}', lines: [58, 59, 60], set: { char: "'" + c + "' → " + d, result: 'unchanged' }, verdict: 'bad', verdictText: 'Returned 0. *out was not written.' });
+        return { id: 'parse', tab: 'parse_u32(' + shown + ')', lanes: LANES.parse, src: src(36, 69), init: { base: '—', v: '—', char: '—', result: '—' }, steps: steps };
+      }
+      if (v > Math.floor((0xFFFFFFFF - d) / base)) {
+        steps.push({ f: 'fn', t: 'caller', label: 'v × ' + base + ' + ' + d + ' would not fit → 0', kind: 'bad', title: 'Overflow, caught early', desc: 'v is ' + v + '. The new value would pass 4294967295. The check runs before the multiply, so nothing has wrapped.', code: 'if (v > (0xFFFFFFFFu - d) / base) {\n  return 0;    /* would overflow */\n}', lines: [62, 63], set: { char: "'" + c + "' → " + d, result: 'unchanged' }, verdict: 'bad', verdictText: 'Returned 0. *out was not written.' });
+        return { id: 'parse', tab: 'parse_u32(' + shown + ')', lanes: LANES.parse, src: src(36, 69), init: { base: '—', v: '—', char: '—', result: '—' }, steps: steps };
+      }
+      var nv = v * base + d;
+      steps.push({ f: 'fn', t: 'fn', label: "'" + c + "' → " + d + ', v = ' + nv, title: 'Add digit ' + (i - p + 1) + ' of ' + (str.length - p), desc: 'v = ' + v + ' × ' + base + ' + ' + d + ' = ' + nv + '. The overflow check passed first.', code: 'v = v * base + (uint32_t)d;', lines: [57, 58, 59, 62, 65], set: { char: "'" + c + "' → " + d, v: vs(nv) } });
+      v = nv;
+    }
+    steps.push({ f: 'fn', t: 'out', label: '*out = v', kind: 'good', title: 'Store the result', desc: 'Only now is the caller\'s variable written.', code: '*out = v;', lines: [67], set: { result: vs(v) } });
+    steps.push({ f: 'fn', t: 'caller', label: 'return 1', kind: 'ret', title: 'Success', desc: '', code: 'return 1;', lines: [68], verdict: 'good', verdictText: shown + ' → ' + vs(v) + '.' });
+    return { id: 'parse', tab: 'parse_u32(' + shown + ')', lanes: LANES.parse, src: src(36, 69), init: { base: '—', v: '—', char: '—', result: '—' }, steps: steps };
+  }
+
+  /* ----- tokenize (lines 80-99), max = 5 as in lib/cli.c ----- */
+  function tokScen(str) {
+    var MAX = 5, a = str.split(''), s = 0, n = 0, words = [], steps = [];
+    var view = function () { return a.map(function (ch, k) { return ch === '\0' ? '␀' : ch === ' ' ? '·' : ch; }).join('') + '␀'; };
+    var show = '"' + str + '"';
+    steps.push({ f: 'caller', t: 'fn', label: 'tokenize(line, words, ' + MAX + ')', title: 'Split a line into words', desc: 'execute() asks for one word more than any command can use, so an extra word is detectable.', code: 'int n = tokenize(line, words, WORDS_MAX + 1);', lines: [80], set: { line: view(), n: 0, words: '[]' } });
+    var guard = 0;
+    while (s < a.length && n < MAX && guard++ < 60) {
+      var k = 0; while (a[s] === ' ') { s++; k++; }
+      if (k) steps.push({ f: 'fn', t: 'fn', label: 'skip ' + k + ' space' + (k > 1 ? 's' : ''), title: 'Skip spaces', desc: 'Spaces before a word are passed over. The line is not changed yet.', code: "while (*s == ' ') {\n  s++;\n}", lines: [85, 86, 87] });
+      if (s >= a.length) { steps.push({ f: 'fn', t: 'fn', label: 'end of line → break', title: 'Only spaces left', desc: 'No more words.', code: "if (*s == '\\0') {\n  break;\n}", lines: [88, 89] }); break; }
+      var start = s; n++;
+      steps.push({ f: 'fn', t: 'out', label: 'argv[' + (n - 1) + '] = &line[' + start + ']', title: 'A word starts here', desc: 'argv[' + (n - 1) + '] points into the line. Nothing is copied.', code: 'argv[n++] = s;', lines: [91], set: { n: n } });
+      while (s < a.length && a[s] !== ' ') s++;
+      var word = a.slice(start, s).join('');
+      steps.push({ f: 'fn', t: 'fn', label: "word = '" + word + "'", title: 'Scan to the end of the word', desc: 'Stops at a space or at the end of the line.', code: "while (*s != '\\0' && *s != ' ') {\n  s++;\n}", lines: [92, 93, 94] });
+      if (s < a.length) {
+        a[s] = '\0'; s++;
+        words.push(word);
+        steps.push({ f: 'fn', t: 'out', label: "NUL after '" + word + "'", kind: 'good', title: 'End the word in place', desc: 'The space becomes a NUL byte, so C now sees "' + word + '" as a string.', code: "if (*s != '\\0') {\n  *s++ = '\\0';\n}", lines: [95, 96, 97], set: { line: view(), words: '[' + words.map(function (w) { return '"' + w + '"'; }).join(', ') + ']' } });
+      } else {
+        words.push(word);
+        steps.push({ f: 'fn', t: 'out', label: "'" + word + "' ends the line", kind: 'good', title: 'The line ended the word', desc: 'The line already ends with a NUL, so nothing to write.', code: "if (*s != '\\0') { ... }", lines: [95], set: { words: '[' + words.map(function (w) { return '"' + w + '"'; }).join(', ') + ']' } });
+      }
+    }
+    var left = s < a.length && a.slice(s).some(function (ch) { return ch !== ' ' && ch !== '\0'; });
+    steps.push({ f: 'fn', t: 'caller', label: 'return ' + n, kind: left ? 'bad' : 'good', title: 'Return the word count', desc: left ? 'The loop stopped at ' + MAX + ' words. The rest of the line is not read, and execute() reports a usage error.' : 'The caller now has ' + n + ' word' + (n === 1 ? '' : 's') + '.', code: 'return n;', lines: [99], set: { n: n }, verdict: left ? 'bad' : 'good', verdictText: show + ' → ' + n + ' word' + (n === 1 ? '' : 's') + (left ? ' (more words were left unread).' : '.') });
+    return { id: 'tok', tab: 'tokenize(' + show + ')', lanes: LANES.tok, src: src(80, 99), init: { line: view(), n: 0, words: '[]' }, steps: steps };
+  }
+
+  var PRESET = {
+    dec: ['0', '7', '1234', '4294967295'],
+    hex: ['0', '255', '0xDEADBEEF', '4294967295'],
+    parse: ['42', '0x1F', '0xFFFFFFFF', '4294967296', '12ab', '0x'],
+    tok: ['peek 0x40020014', 'poke  0x40020014   1', 'led on', 'a b c d e f', '   ']
+  };
+  var fn = 'dec', inp = $('inp'), err = $('err'), seg = $('fnseg'), pre = $('presets');
+  var ctl = Seq.mount($('seq'), { file: 'lib/fmt.c', key: 'uartNumSide', lanes: LANES.out, scenarios: [decScen(1234)], src: [] });
+
+  function apply() {
+    err.textContent = '';
+    var s = inp.value, r;
+    if (fn === 'dec' || fn === 'hex') {
+      var v = num(s);
+      if (v === null) { err.textContent = 'Enter 0 to 4294967295, or 0x…'; return; }
+      r = fn === 'dec' ? decScen(v) : hexScen(v);
+    } else if (fn === 'parse') {
+      r = parseScen(s);
+    } else {
+      r = tokScen(s);
+    }
+    ctl.setScenario(0, r);
+  }
+  function presets() {
+    pre.textContent = '';
+    PRESET[fn].forEach(function (p) {
+      var b = document.createElement('button'); b.textContent = p.trim() === '' ? '(spaces)' : p;
+      b.onclick = function () { inp.value = p; apply(); };
+      pre.appendChild(b);
+    });
+  }
+  Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      fn = b.dataset.f;
+      Array.prototype.forEach.call(seg.querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      inp.value = PRESET[fn][2] !== undefined ? PRESET[fn][2] : PRESET[fn][0];
+      presets(); apply();
+    };
+  });
+  inp.addEventListener('input', apply);
+  inp.value = '1234'; presets(); apply();
+})();
+</script>
+</body>
+</html>
