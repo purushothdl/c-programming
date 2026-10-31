@@ -7,12 +7,13 @@ description: Build an interactive HTML lesson page for a firmware program, a per
 
 Output: one HTML page, `visualizations/<topic>/<name>.html` (`uart/`, `tim/`, `spi/`, ...), light and dark mode. It is a **lesson, not a poster**: the reader steps, drags and clicks, and the page shows what changes. Add the page to `visualizations/index.html`.
 
-Pages share four files in `visualizations/shared/`. **Do not copy their code into a page.**
+Pages share these files in `visualizations/shared/` and `visualizations/themes/`. **Do not copy their code into a page.**
 
 | File | Gives you |
 |---|---|
 | `style.css` | tokens, nav, hero, flow strip, window frame, labs, tables, bit builder, sequence and code-sheet styles |
 | `theme.js` | light/dark toggle (`<button class="tg" id="theme"></button>`) |
+| `themes.js` | design switch in the nav (Original, Claude, Notion, ...) and its loader. Each design is one CSS file in `themes/<id>.css` |
 | `split.js` | draggable divider, `Split.init(...)` |
 | `seq.js` | the sequence lesson: `Seq.mount(el, { lanes, scenarios, src, ... })`. API in `lessons.md` |
 
@@ -43,6 +44,13 @@ Numbers you measured are *sample data*: give the machine, the tool version, and 
 - **Correct before clever.** Widgets compute from real values. Wrong numbers in an interactive page teach the wrong thing faster than a wrong paragraph.
 - **Small and sharp.** 14px text, 12px widgets, 4px corners, hairline borders. See `design-system.md`.
 
+## The brief decides the layout
+
+The templates are defaults, not requirements. Before building:
+- **Detailed brief** (the user says what to see, touch or leave out): follow it. Design the page around it, reuse shared pieces where they fit, and write page-specific widgets where they do not. Do not add a hero, flow strip, Watch or Code sheet that was not asked for.
+- **Vague brief** ("visualize X"): pick the shape yourself from `lessons.md` ("Other shapes" too), and say in one line which shape you chose and why. Do not ask unless the answer changes what you verify.
+- **Always, whatever the layout:** the theme, claims checked against their authority, measured numbers labelled as one run, a "what goes wrong" case when the idea allows one, a browser test, and a note of what was simplified.
+
 ## Workflow
 
 1. **Read the source** (`programs/<name>/…`, `lib/*.c`). Note constants, ISR logic, init order, and comments that give reasons. Line numbers move: always re-read the file now, never reuse numbers from an old page. Get numbers with `grep -n`, not from memory.
@@ -51,9 +59,9 @@ Numbers you measured are *sample data*: give the machine, the tool version, and 
    - Tables and sequences (filter tables, enable order, flag-clear rules, tolerance tables): RM0390 or PM0214 via `pdf-mcp`, starting at `docs/contents.md`. Keep the page number and cite it on the page.
    - Derived numbers (tick, wrap time, BRR, byte time): compute them and compare with the source comments.
 3. **Pick 3 or 4 lessons** from `lessons.md`. Typical: a **sequence** (centrepiece), a **tuning lab** or **model** for the magic number, a **register builder**, one or two **calculators**, then short **init order** and **gotchas** lists.
-4. **Build** from `template.html`. Put source lines in the page as `[N, 'text']` literals, then run `tools/fix-src.py page.html source.c --check`. It fixes wrong text (drop `--check`) and **warns when a number is stale** (the text sits at another line). It cannot know a number is the *right* one for the step: after it passes, confirm each highlighted line contains the identifier the step is about. For input-driven steps (a function stepper), embed the source file as an array and slice it by line number. Seq prints console warnings for highlights that are not in `src`; treat any as a bug.
+4. **Build** from `template.html`. Keep the `<script src="../shared/themes.js"></script>` line just before `</head>` (after the page's own `<style>`), so the design switch works and theme rules win. Do not put colours, fonts or radii in the page's `<style>`: use the tokens (`--bg`, `--card`, `--ink`, `--ember`, `--line`, `--btn`, ...). If a new class needs a per-design look, add a rule to each `themes/*.css`. Put source lines in the page as `[N, 'text']` literals, then run `tools/fix-src.py page.html source.c --check`. It fixes wrong text (drop `--check`) and **warns when a number is stale** (the text sits at another line). It cannot know a number is the *right* one for the step: after it passes, confirm each highlighted line contains the identifier the step is about. For input-driven steps (a function stepper), embed the source file as an array and slice it by line number. Seq prints console warnings for highlights that are not in `src`; treat any as a bug.
 5. **Replay the real algorithm in JS** for anything with logic (ISR, parser, debounce). Never hand-write verdicts or intermediate values. The sample run must reproduce the numbers in the source comments. When one page shows the same event in two places (a sequence and a lab), make both read from one model; check their **phase** too (does the first arrival start at t = 0 or one byte-time in?) and compare the two outputs.
-6. **Test in the browser.** `tools/browser-test.sh /abs/page.html "js" out.png [--mobile] [--at=#id]` runs Chrome headless, runs your JS, prints console output and saves a screenshot. `--mobile` renders at 390px; `--at=#id` crops to a section (headless always captures from the top). Turn checks into console assertions (`console.log('WATCH', ...)`, the highlighted `.ln.cur` line numbers, verdict text) rather than only reading the PNG. Check: no console errors or Seq warnings, the highlighted source lines are the ones you meant, both themes, 390px, and each interaction you added. Then read the PNG.
+6. **Test in the browser.** `tools/browser-test.sh /abs/page.html "js" out.png [--mobile] [--at=#id]` runs Chrome headless, runs your JS, prints console output and saves a screenshot. `--mobile` renders at 390px; `--at=#id` crops to a section (headless always captures from the top). Turn checks into console assertions (`console.log('WATCH', ...)`, the highlighted `.ln.cur` line numbers, verdict text) rather than only reading the PNG. Check: no console errors or Seq warnings, the highlighted source lines are the ones you meant, every design in the switch (click each button in `.seg`, wait about 500 ms for the stylesheet to load, then read the background), light and dark, 390px, and each interaction you added. Then read the PNG, at least once in a non-Original design.
 7. **Report**: what was verified and where (SVD fields, manual pages), what is sample or illustrative data, what is a simplified model, and what was not verified.
 
 ## Rules that came from review

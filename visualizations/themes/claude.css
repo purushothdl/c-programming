@@ -1,0 +1,82 @@
+/* Theme: Claude. Warm parchment printed artifact: ink on bone paper, clay as the one chromatic accent.
+   Anthropic Serif and Sans are not public: Source Serif 4 and Inter stand in.
+   The reference is light only; the dark values are a derived warm inverse.
+   Loaded by shared/themes.js after the page's own styles. Colours, fonts and radii only. */
+:root {
+  --serif: "Source Serif 4", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --bg: #f8f8f6; --card: #ffffff; --card-2: #efeeeb;
+  --line: #b7b7b5; --line-2: #e7e6e1;
+  --ink: #121212; --ink-2: #373734; --ink-3: #7b7974;
+  --ember: #d97757; --ok: #373734; --bad: #d97757; --warn: #7b7974;
+  --btn: #121212; --btn-ink: #f8f8f6; --linen: #efeeeb;
+  --shadow: rgba(0,0,0,.04) 0px 4px 20px 0px;
+}
+:root[data-theme="dark"] {
+  --bg: #1c1c1a; --card: #262624; --card-2: #30302d;
+  --line: #5a5955; --line-2: #363632;
+  --ink: #f8f8f6; --ink-2: #d6d5cf; --ink-3: #9c9a92;
+  --ember: #d97757; --ok: #d6d5cf; --bad: #d97757; --warn: #9c9a92;
+  --btn: #f8f8f6; --btn-ink: #121212; --linen: #30302d;
+  --shadow: 0 4px 20px rgba(0,0,0,.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1a; --card: #262624; --card-2: #30302d;
+    --line: #5a5955; --line-2: #363632;
+    --ink: #f8f8f6; --ink-2: #d6d5cf; --ink-3: #9c9a92;
+    --ember: #d97757; --ok: #d6d5cf; --bad: #d97757; --warn: #9c9a92;
+    --btn: #f8f8f6; --btn-ink: #121212; --linen: #30302d;
+    --shadow: 0 4px 20px rgba(0,0,0,.3);
+  }
+}
+
+section { padding-top: 72px; }
+h1, h2 { font-family: var(--serif); }
+h1 { font-size: clamp(36px, 5vw, 48px); line-height: 1.12; letter-spacing: -.01em; }
+h2 { font-size: 30px; line-height: 1.2; letter-spacing: 0; }
+.eyebrow { font-family: "Inter", sans-serif; font-size: 12px; }
+.hero .eyebrow::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ember); margin-right: 8px; }
+.serif { font-family: "Inter", system-ui, sans-serif; font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+.sh p { font-size: 16px; line-height: 1.5; color: var(--ink-3); }
+
+nav { background: var(--bg); border-bottom-color: var(--line-2); backdrop-filter: none; }
+nav .brand { font-family: "Inter", sans-serif; font-weight: 500; font-size: 14px; }
+nav .brand::before { border-radius: 2px; }
+nav a.l { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.tg, .seg { border-radius: 8px; }
+
+.btn { font: 500 14px/1.5 "Inter", sans-serif; padding: 8px 18px; border-radius: 8px; }
+.btn.dark { padding: 8px 20px; }
+.btn.ghost { background: transparent; border-color: var(--line); }
+.btn.sm { padding: 6px 12px; font-size: 13px; }
+
+code { background: var(--card-2); border-color: var(--line-2); border-radius: 6px; }
+input[type=text], input[type=number], select { border-radius: 8px; font-family: "Inter", sans-serif; }
+input[type=range] { accent-color: var(--ink); }
+
+.card, .spec, .flow, .order, .gl div, .watch, .sheet, .out, .pcode, .tier { border-radius: 16px; }
+.bit, .chip, .tag { border-radius: 8px; }
+.tier { border-radius: 24px; padding: 32px; }
+.win { border-radius: 24px; box-shadow: var(--shadow); }
+.spec, .flow, .order, .card, .tier { border-color: var(--line-2); }
+.gl div { padding: 24px; font-size: 14px; }
+.gl b { font-size: 14px; }
+.flow .s { padding: 16px 18px; }
+.flow .s i { font-family: "Inter", sans-serif; }
+.spec b, .flow .s b { font-weight: 500; }
+.tab { font-family: "Inter", sans-serif; font-size: 13px; }
+.sverdict { border-radius: 8px; }
+.sverdict.good::before { content: "✓  "; }
+.sverdict.bad::before { content: "✕  "; }
+.win-val { font-family: "Inter", sans-serif; font-weight: 500; }
+.sheet-body { font-size: 12px; }
+
+.tier h3 { font: 400 24px/1.2 var(--serif); }
+.tier .big { font: 580 30px/1.2 "Inter", sans-serif; letter-spacing: -.01em; }
+.tier p { font-size: 14px; }
+.faq summary { font-size: 16px; }
+.faq details p { font-size: 14px; }
+
+.band { background: #000; color: #9c9a92; }
+.band b { color: #f8f8f6; }
+.band .fine { color: #9c9a92; }
