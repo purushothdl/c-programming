@@ -1,17 +1,20 @@
 #include "stm32f4xx.h"
 #include "pwm.h"
+#include "clock.h"
 
 /*
- * TIM2 runs from APB1. At reset the APB1 prescaler is /1, so the timer clock is
- * 16 MHz (HSI) (RM0390 6.2: TIMxCLK = PCLKx when the APB prescaler is 1).
+ * TIM2 counts from the APB1 timer clock (lib/clock.h): 16 MHz at reset, 90 MHz
+ * after clock_init() (RM0390 6.2: 2x PCLK1 when the APB1 prescaler is above 1).
+ * PSC is computed from it at init, so the tick stays 1 us either way.
  *
- *   tick   = 16 MHz / (PSC + 1) = 16 MHz / 16 = 1 MHz     (1 us per tick)
- *   period = (ARR + 1) ticks    = 1000 ticks              = 1 ms -> 1 kHz
- *   duty   = CCR1 / (ARR + 1)   = CCR1 / 1000             (1000 steps)
+ *   tick   = timer clock / (PSC + 1) = 1 MHz              (1 us per tick)
+ *            PSC = 15 at 16 MHz, 89 at 90 MHz
+ *   period = (ARR + 1) ticks         = 1000 ticks         = 1 ms -> 1 kHz
+ *   duty   = CCR1 / (ARR + 1)        = CCR1 / 1000        (1000 steps)
  *
- * For a visible 1 Hz blink instead, use PSC = 15999.
+ * For a visible 1 Hz blink instead, tick at 1 kHz: PSC = timer clock / 1000 - 1.
  */
-#define TIM2_PSC        15u
+#define TIM2_TICK_HZ    1000000u
 #define TIM2_ARR        (PWM_STEPS - 1u)
 #define PA5_AF_TIM2_CH1 1u                  /* datasheet table 11 */
 
@@ -34,7 +37,7 @@ void pwm_init(uint32_t duty)
 
     /* PSC, ARR and CCR1 are preloaded: these writes reach the live registers
        only on an update event (forced below). */
-    TIM2->PSC = TIM2_PSC;
+    TIM2->PSC = (clock_tim_apb1_hz() / TIM2_TICK_HZ) - 1u;
     TIM2->ARR = TIM2_ARR;
     TIM2->CCR1 = duty;
 

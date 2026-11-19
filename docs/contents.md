@@ -1,6 +1,12 @@
 # Reference Manuals — Index
 
-STM32F446RE reference documents, all under `~/books/Hardware-and-Systems/STM32/`.
+Reference documents live outside the repo under `~/Books/Hardware-and-Systems/`:
+
+- `STM32/` — the MCU and the board (ST documents, plus a copy of the SVD)
+- `Components/` — off-board parts wired to the board (sensors, readers, displays)
+- `ARM/` — general Cortex-M teaching material, not authoritative
+
+## STM32F446RE and the Nucleo board (`STM32/`)
 
 Use the `pdf-mcp` tools (`pdf_search`, `pdf_get_toc`, `pdf_read_pages`) to query them.
 
@@ -10,6 +16,15 @@ Use the `pdf-mcp` tools (`pdf_search`, `pdf_get_toc`, `pdf_read_pages`) to query
 | Datasheet — STM32F446xC/E | `stm32f446mc.pdf` | 197 | [docs/datasheet.md](datasheet.md) |
 | UM1724 — Nucleo-64 board user manual | `um1724-stm32-nucleo64-boards-mb1136-stmicroelectronics.pdf` | 91 | [docs/um1724.md](um1724.md) |
 | PM0214 — Cortex-M4 programming manual | `pm0214-stm32-cortexm4-mcus-and-mpus-programming-manual-stmicroelectronics.pdf` | 262 | [docs/pm0214.md](pm0214.md) |
+
+## Components (`Components/`)
+
+| Doc | File | Pages | Index |
+|-----|------|-------|-------|
+| MFRC522 — RFID reader IC (RC522 module) | `MFRC522.pdf` | 95 | [docs/mfrc522.md](mfrc522.md) |
+
+A component's registers come from its own datasheet, never from the STM32 SVD
+or RM0390. The STM32 side of the link (SPI, I2C, UART setup) still comes from RM0390.
 
 Workflow: pick a doc, open its index, then `pdf_search`/`pdf_read_pages` on demand.
 Never dump a full TOC into context — query on demand.
@@ -22,3 +37,5 @@ Never dump a full TOC into context — query on demand.
   core peripherals (NVIC, SCB, SysTick, MPU, FPU). Use it for anything at `0xE000_E000`+ and for
   assembly/startup questions; use RM0390 for ST peripherals.
 - **Board manual** — curated board facts; pinouts for other Nucleo boards are queryable on demand.
+- **Component datasheet** — register map, bus framing (e.g. the SPI address byte), command set,
+  timing limits. Check the bus mode and maximum clock here before configuring the STM32 side.

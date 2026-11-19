@@ -1,6 +1,6 @@
 # Datasheet — STM32F446xC/E — Key Sections & Tables
 
-Document: `~/books/Hardware-and-Systems/STM32/stm32f446mc.pdf`
+Document: `~/Books/Hardware-and-Systems/STM32/stm32f446mc.pdf`
 (197 pages, Tables 1–118)
 
 Page numbers are **PDF page numbers**, not printed numbers.

@@ -31,6 +31,7 @@
 #define TIM5_TICK_HZ    16000000u
 #define PA0_AF_TIM5_CH1 2u                  /* datasheet table 11 */
 #define NO_EDGE_TICKS   TIM5_TICK_HZ        /* no rising edge for 1 s: no signal */
+#define RESET_DELAY_TICKS 2u                /* edge to counter reset, measured */
 
 static void measure_pin_init(void)
 {
@@ -122,14 +123,15 @@ static void cmd_measure(char *args[])
         return;
     }
 
-    /* Figure 186 in RM0390: CNT runs 0,1,2,3,4 then resets, and CCR1 reads 4.
-       The capture stores the last value before the reset, so a span is the
-       captured value + 1 ticks. Check this on the board: 1 kHz should give
-       CCR1 = 15999 here if the rule holds. */
+    /* The capture is taken on the edge, but the counter reset reaches CNT
+       2 ticks later (trigger resynchronization, RM0390 17.3.14). CNT counts
+       2 ticks past the edge before it restarts, so every span is the captured
+       value + 2. Measured on the board: 1 kHz gives CCR1 = 15998, CCR2 =
+       duty x 16 - 2. RM0390 figure 186 leaves this delay out. */
     uint32_t ccr1 = TIM5->CCR1;
     uint32_t ccr2 = TIM5->CCR2;
-    uint32_t period = ccr1 + 1u;
-    uint32_t high = ccr2 + 1u;
+    uint32_t period = ccr1 + RESET_DELAY_TICKS;
+    uint32_t high = ccr2 + RESET_DELAY_TICKS;
 
     uart_puts("CCR1 ");
     print_dec32(uart_putc, ccr1);

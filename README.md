@@ -3,7 +3,9 @@
 Target: STM32F446RE on the NUCLEO-F446RE board (Cortex-M4, Thumb, ELF, bare metal).
 
 Authoritative register reference: `svd/stm32f446re.svd` at the repo root.
-Board and chip documentation: `docs/` and the RM0390/UM1724 PDFs.
+Board and chip documentation: `docs/` (start at `docs/contents.md`) and the PDFs
+under `~/Books/Hardware-and-Systems/`: `STM32/` for the MCU and board,
+`Components/` for off-board parts such as the MFRC522 RFID reader.
 
 ## Layout
 

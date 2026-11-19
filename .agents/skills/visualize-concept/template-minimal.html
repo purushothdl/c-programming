@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- Minimal template: one sequence, no hero, no flow strip, no Watch, no Code sheet.
+     Use it when a concept needs one picture (a protocol, a handshake, a syscall).
+     Copy to visualizations/<topic>/<name>.html and replace every TODO. Add any piece from template.html
+     (hero, flow strip, labs, gotchas) in any order if the lesson needs it. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TODO name, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<script src="../shared/themes.js"></script>
+</head>
+<body>
+<nav><div class="wrap"><a class="brand" href="../index.html">TODO name <span>TODO topic</span></a><button class="tg" id="theme"></button></div></nav>
+<main class="wrap">
+  <section>
+    <div class="sh"><div class="eyebrow">TODO topic</div><h1 style="font-size:36px">TODO the question this answers</h1><p>TODO one or two lines.</p></div>
+    <div id="seq"></div>
+  </section>
+  <footer>Source: TODO where each claim was checked (doc, spec, command output) · simplifications: TODO</footer>
+</main>
+<script src="../shared/theme.js"></script>
+<script src="../shared/split.js"></script>
+<script src="../shared/seq.js"></script>
+<script>
+Seq.mount(document.getElementById('seq'), {
+  key: 'todoSide', watch: false, code: false,
+  lanes: [{ id: 'a', t: 'TODO', s: 'who' }, { id: 'b', t: 'TODO', s: 'who' }],
+  scenarios: [
+    { id: 'main', tab: 'main case', steps: [
+      { f: 'a', t: 'b', label: 'TODO', title: 'TODO', desc: 'TODO one or two short sentences.' }
+    ] },
+    { id: 'bug', tab: 'what goes wrong', bug: true, steps: [
+      { f: 'a', t: 'b', label: 'TODO', kind: 'bad', title: 'TODO', desc: 'TODO', verdict: 'bad', verdictText: 'TODO' }
+    ] }
+  ]
+});
+</script>
+</body>
+</html>

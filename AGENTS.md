@@ -15,16 +15,30 @@
 
 ## Reference manuals (PDF)
 
-Books live outside the repo under `~/books/Hardware-and-Systems/STM32/`:
+Books live outside the repo under `~/Books/Hardware-and-Systems/`, in three folders:
+
+| Folder | Holds | Authority for |
+|---|---|---|
+| `STM32/` | ST documents for the MCU and the board | everything on the STM32 side |
+| `Components/` | datasheets for off-board parts wired to the board | that part's registers, bus framing and commands |
+| `ARM/` | general Cortex-M teaching slides | nothing: background reading only |
+
+New component datasheets go in `Components/`, with an index in `docs/<part>.md` and a row in `docs/contents.md`.
+
+`STM32/`:
 
 - `rm0390-stm32f446xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf` — RM0390, the F446RE **reference manual** (1321 pages)
 - `stm32f446mc.pdf` — the F446RE **datasheet** (197 pages)
 - `um1724-stm32-nucleo64-boards-mb1136-stmicroelectronics.pdf` — UM1724, Nucleo-64 board user manual (91 pages)
 - `pm0214-stm32-cortexm4-mcus-and-mpus-programming-manual-stmicroelectronics.pdf` — PM0214, Cortex-M4 **programming manual** (262 pages): core registers, exception model/vector table, instruction set, and core peripherals (NVIC, SCB, SysTick, MPU, FPU)
 
+`Components/`:
+
+- `MFRC522.pdf` — NXP MFRC522, the RFID reader IC on the RC522 module (95 pages): SPI address byte format, register map, command set, self test
+
 Use the `pdf-mcp` tools (`pdf_search`, `pdf_get_toc`, `pdf_read_pages`) to query
 them. Indexes live under `docs/` — start at `docs/contents.md` to pick a
-document, then open its per-doc index (`rm0390.md`, `datasheet.md`, `um1724.md`, `pm0214.md`)
+document, then open its per-doc index (`rm0390.md`, `datasheet.md`, `um1724.md`, `pm0214.md`, `mfrc522.md`)
 to find the chapter/section/table. Do not dump full TOCs into context; query on demand.
 
 ## Conventions
@@ -32,6 +46,7 @@ to find the chapter/section/table. Do not dump full TOCs into context; query on 
 - SVD files live under `svd/`, named `<chip>.svd`.
 - When starting work on a register/peripheral, look it up from the SVD first; do not guess addresses or bit positions.
 - Core peripherals (NVIC, SCB, SysTick, MPU, FPU) and ARM instruction/exception details come from PM0214, not RM0390; ST peripherals (RCC, GPIO, USART...) come from RM0390.
+- Off-board components (e.g. the MFRC522) come from their own datasheet in `Components/`. Their registers are not in the SVD; do not look them up there.
 - For prose/sequences beyond the SVD (clock tree, AF mapping, programming steps), consult the reference manual via `pdf-mcp` — see `docs/contents.md` for the doc index.
 
 ## Skills

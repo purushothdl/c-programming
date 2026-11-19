@@ -4,7 +4,9 @@
 #include <stdint.h>
 
 /*
- * Interrupt-driven USART2 (115200 8N1 on PA2/PA3, 16 MHz clock).
+ * Interrupt-driven USART2 (115200 8N1 on PA2/PA3). The baud divider comes from
+ * the PCLK1 that lib/clock.h reports, so call clock_init() first if the program
+ * uses it.
  *
  *   USART2 ISR  --RX ring-->  caller (uart_rx_pop)
  *   caller      --TX ring-->  USART2 ISR (TXE interrupt drains one byte)

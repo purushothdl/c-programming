@@ -37,6 +37,13 @@
 </header>
 
 <section class="group">
+  <h2>Clocks <span>clock/</span></h2>
+  <div class="list">
+    <a class="item" href="clock/pll.html"><b>Why a PLL needs a slow beat</b><p>A fast oscillator drifts. Lock it to a slow reference, heat the chip, and see how often it is checked. Then pick M, N and P against the limits in RM0390.</p><span class="src">RM0390 §6.3.2 · RCC_PLLCFGR</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
   <h2>UART <span>uart/</span></h2>
   <div class="list">
     <a class="item" href="uart/poll-vs-irq.html"><b>Why we need the ring</b><p>One millisecond of sleep lets eleven bytes pile up behind one register. Step through the loss, then drag the look interval until the same code stops losing data.</p><span class="src">programs/uart_echo_poll.c · RM0390 §25.4.3</span><span class="st new">new style</span></a>

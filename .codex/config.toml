@@ -1,0 +1,25 @@
+[mcp_servers.embedded-debugger]
+command = "/Users/purushothdl/.local/bin/embedded-debugger-mcp"
+args = ["serve"]
+
+[mcp_servers.embedded-debugger.env]
+RUST_LOG = "info"
+
+[mcp_servers.mcp-svd]
+command = "node"
+args = ["/Users/purushothdl/.local/share/mcp-svd/dist/index.js"]
+
+[mcp_servers.opencode]
+command = "npx"
+args = [
+    "-y",
+    "claude-opencode-mcp",
+]
+
+[mcp_servers.opencode.env]
+OPENCODE_BIN = "/Users/purushothdl/.local/share/opencode-1.18/node_modules/.bin/opencode"
+XDG_DATA_HOME = "/Users/purushothdl/.local/share/opencode-1.18/data"
+
+[mcp_servers.pdf-mcp]
+command = "uvx"
+args = ["pdf-mcp"]

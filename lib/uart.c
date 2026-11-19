@@ -1,11 +1,13 @@
 #include "stm32f4xx.h"
 #include "uart.h"
+#include "clock.h"
 #include "fmt.h"
 #include "ring.h"
 
-#define USART2_CLK_HZ 16000000u   /* PCLK1 at the reset-default clock setup */
+/* BRR = PCLK1 / baud, rounded (16x oversampling: the register holds the divider
+   in 1/16ths). 16 MHz gives 139, 45 MHz gives 391. Read at init, so uart_init()
+   must run after clock_init(). */
 #define UART_BAUD 115200u
-#define UART_BRR ((USART2_CLK_HZ + (UART_BAUD / 2u)) / UART_BAUD)
 #define UART_AF 7u
 
 static ring_t g_tx;              /* producer: caller,     consumer: USART2 ISR */
@@ -30,7 +32,7 @@ void uart_init(void)
     USART2->CR1 = 0u;
     USART2->CR2 = 0u;
     USART2->CR3 = 0u;
-    USART2->BRR = UART_BRR;
+    USART2->BRR = (clock_pclk1_hz() + (UART_BAUD / 2u)) / UART_BAUD;
 
     /* RXNEIE: interrupt per received byte. TXEIE is enabled later, only while
        there is something to send. */

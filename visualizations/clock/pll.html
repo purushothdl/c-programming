@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PLL, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+.cmp { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cmp td { font-family: Inter, sans-serif; white-space: normal; }
+.cmp th, .cmp td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.cmp th { font: 500 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.cmp tr.me td { background: color-mix(in srgb, var(--ember) 9%, transparent); }
+.cmp tr.me td:first-child { box-shadow: inset 3px 0 0 var(--ember); }
+.plot { overflow-x: auto; }
+.plot svg { width: 100%; height: auto; display: block; min-width: 640px; }
+.plot text { font-family: "JetBrains Mono", monospace; font-size: 8px; fill: var(--ink-3); }
+.plot .ax { stroke: var(--line-2); stroke-width: 1; }
+.plot .free { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-linejoin: round; }
+.plot .lock { fill: none; stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; }
+.plot .edge { stroke: var(--ink-3); stroke-width: 1; opacity: .5; }
+.plot .note { fill: var(--ink-2); font-size: 9px; }
+.rng { position: relative; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); overflow: hidden; }
+.rng .ok { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.rng .pt { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--ink); }
+.rng.badpt .pt { background: var(--bad); }
+.rl { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); position: relative; height: 14px; margin-top: 3px; }
+.rl span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.rl span:first-child { transform: none; } .rl span:last-child { transform: translateX(-100%); }
+.chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+.chain > div { border: 1px solid var(--line); border-radius: 4px; background: var(--card-2); padding: 8px 12px; min-width: 120px; }
+.chain > div small { display: block; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.chain > div b { font: 500 16px "JetBrains Mono", monospace; }
+.chain > i { align-self: center; font-style: normal; color: var(--ink-3); font: 400 11px "JetBrains Mono", monospace; }
+.chain > div.bad { border-color: var(--bad); } .chain > div.bad b { color: var(--bad); }
+input.num { width: 70px; }
+</style>
+<script src="../shared/themes.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">PLL <span>why a slow beat</span></a>
+    <a class="l" href="#two">Two clocks</a>
+    <a class="l" href="#lab">Lock lab</a>
+    <a class="l" href="#calc">M, N, P</a>
+    <a class="l" href="#use">Where used</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header class="hero">
+  <div>
+    <div class="eyebrow">RM0390 §6.3.2 · RCC_PLLCFGR · HSI 16 MHz → 180 MHz</div>
+    <h1 style="margin-top:14px">A fast clock that wanders, <em>kept honest by a slow one.</em></h1>
+    <p class="serif">You cannot get a steady 180 MHz straight from a small, cheap oscillator. A PLL builds one from two parts: a fast oscillator that drifts, and a slow reference that does not. Every few ticks it checks the fast one against the slow one and nudges it back.</p>
+    <div class="cta">
+      <a class="btn dark" href="#lab">Break the lock →</a>
+      <a class="btn" href="#calc">Try M, N, P</a>
+    </div>
+  </div>
+  <div class="spec">
+    <div><span>Reference in</span><b>HSI 16 MHz ÷ M</b></div>
+    <div><span>Fast oscillator (VCO)</span><b>reference × N</b></div>
+    <div><span>Output</span><b>VCO ÷ P</b></div>
+    <div><span>Our plan</span><b>M 8 · N 180 · P 2</b></div>
+    <div><span>Result</span><b>2 MHz → 360 MHz → 180 MHz</b></div>
+  </div>
+</header>
+
+<section id="two">
+  <div class="sh"><div class="eyebrow">01 · the problem</div><h2>Steady or fast. Not both.</h2>
+    <p>Each kind of clock is good at one thing. The PLL takes the steady part from one and the fast part from the other.</p></div>
+  <div class="win"><div class="lab">
+    <div style="overflow-x:auto"><table class="cmp">
+      <thead><tr><th>Clock</th><th>Speed</th><th>Steady?</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><b>Reference</b><br>HSI at 16 MHz (here), or a crystal</td><td>slow</td><td>yes</td><td>A slow signal is easy to keep exact. Counting 16 million ticks a second is a small job.</td></tr>
+        <tr><td><b>Free-running fast oscillator</b><br>the VCO alone</td><td>fast</td><td>no</td><td>Its speed moves with heat, voltage and noise. Nothing holds it.</td></tr>
+        <tr class="me"><td><b>PLL</b><br>both together</td><td>fast</td><td>yes</td><td>The fast one is compared with the slow one over and over, and pulled back each time it drifts.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="hint">General background, not from RM0390. The one fact from this repo: the 16 MHz HSI is an internal RC oscillator, not a crystal, so "steady" here means steady enough to anchor the PLL. The manual does not describe the PLL's inner loop.</p>
+  </div></div>
+</section>
+
+<section id="lab">
+  <div class="sh"><div class="eyebrow">02 · lock lab</div><h2>What the slow beat buys you</h2>
+    <p>Grey line: the fast oscillator on its own. Orange line: the same oscillator with the PLL checking it. Each thin vertical tick is one check against the reference. Press <b>Heat the chip</b> and watch what happens to each line.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <span class="seg" id="lockSeg"><button data-v="1" aria-pressed="true">PLL locked</button><button data-v="0" aria-pressed="false">PLL off</button></span>
+      <span class="seg" id="refSeg"><button data-v="2" aria-pressed="true">Reference 2 MHz (M = 8)</button><button data-v="1" aria-pressed="false">Reference 1 MHz (M = 16)</button></span>
+      <label><input type="checkbox" id="heat"> Heat the chip (from 20 µs)</label>
+    </div>
+    <div class="plot"><svg id="svg" viewBox="0 0 780 230" role="img" aria-label="Frequency error of the fast oscillator over time"></svg></div>
+    <div class="score" id="score"></div>
+    <p class="hint">Illustrative model, not a measurement. The "oscillator" wanders randomly and, if you heat it, slides at a steady rate. At every reference tick the loop measures the average error of the last period and subtracts most of it. The real STM32 loop filter is different and is not described in RM0390. What carries over: <b>between two checks the oscillator is on its own</b>, so a longer gap lets it wander farther. Error is shown in ppm (parts per million): 100 ppm of 180 MHz is 18 kHz.</p>
+  </div></div>
+</section>
+
+<section id="calc">
+  <div class="sh"><div class="eyebrow">03 · M, N, P</div><h2>Pick the three numbers</h2>
+    <p>The chip gives you three whole-number dials. Each has a limit from RM0390 p. 130. The two presets are the plan and the M = 16 alternative from the last step.</p></div>
+  <div class="win"><div class="lab">
+    <div class="ctrls">
+      <label>M (÷) <input class="num" type="number" id="M" min="0" max="64" value="8" aria-label="PLLM"></label>
+      <label>N (×) <input class="num" type="number" id="N" min="0" max="440" value="180" aria-label="PLLN"></label>
+      <label>P (÷) <select id="P" aria-label="PLLP"><option>2</option><option>4</option><option>6</option><option>8</option></select></label>
+      <span class="seg" id="pre"><button data-m="8" data-n="180" data-p="2" aria-pressed="true">Plan: 8 · 180 · 2</button><button data-m="16" data-n="360" data-p="2" aria-pressed="false">Yours: 16 · 360 · 2</button><button data-m="4" data-n="180" data-p="2" aria-pressed="false">M = 4</button><button data-m="8" data-n="250" data-p="2" aria-pressed="false">N = 250</button></span>
+    </div>
+    <div class="chain" id="chain"></div>
+    <div>
+      <div class="hint" style="margin-bottom:4px">VCO speed against its allowed window (100 to 432 MHz)</div>
+      <div class="rng" id="rng"></div>
+      <div class="rl" id="rl"></div>
+    </div>
+    <div class="score" id="cscore"></div>
+    <p class="hint" id="chint"></p>
+  </div></div>
+</section>
+
+<section id="use">
+  <div class="sh"><div class="eyebrow">04 · where else</div><h2>Where PLLs show up</h2>
+    <p>Any time a device needs a fast clock it can trust, or needs to pick one of many clocks by changing a number.</p></div>
+  <div class="gl">
+    <div><b>This chip: system clock</b>The main PLL makes SYSCLK. P is the last divider before it (SVD: RCC_PLLCFGR.PLLM, PLLN, PLLP).</div>
+    <div><b>This chip: USB, SDIO, random numbers</b>The same VCO feeds a second divider, PLLQ, for these peripherals (SVD description of PLLQ).</div>
+    <div><b>This chip: audio</b>A second PLL called PLLI2S exists for audio clocks (SVD name for the PLLSRC field).</div>
+    <div><b>Radios (general)</b>Wi-Fi, Bluetooth and FM radios choose a channel by changing N. The dial is one number.</div>
+    <div><b>Computers and phones (general)</b>CPU and memory clocks are built from a slow reference the same way, and can be changed while running.</div>
+    <div><b>Data links (general)</b>A receiver can use a PLL to recover the sender's clock from the data itself.</div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">05 · easy to get wrong</div><h2>Gotchas (RM0390 p. 130)</h2></div>
+  <div class="gl">
+    <div><b>M, N and P only change while the PLL is off</b>The manual says these bits "can be written only if PLL is disabled". Write them first, then turn the PLL on.</div>
+    <div><b>Reference must be 1 to 2 MHz</b>Outside that range the setting is a "wrong configuration". 2 MHz is "recommended … to limit PLL jitter".</div>
+    <div><b>VCO must be 100 to 432 MHz</b>The window caps how high you can go. Also, P can be 2, 4, 6 or 8, never 1. So the VCO must run at least twice as fast as SYSCLK, and that is why the chain goes up to 360 and back down to 180.</div>
+    <div><b>N has its own range</b>50 to 432. Below 100 is only allowed when the reference is above 1 MHz, and the VCO must still reach 100 MHz.</div>
+    <div><b>P must not push SYSCLK past 180 MHz</b>The manual leaves this check to you.</div>
+    <div><b>Locking takes time</b>After you turn the PLL on, it needs time to lock. The next step waits for the PLLRDY flag before using it.</div>
+  </div>
+</section>
+
+<footer>Source: RM0390 §6.3.2 p. 130 (limits on M, N, P, VCO and SYSCLK, the 2 MHz advice) · SVD RCC_PLLCFGR (PLLM [5:0], PLLN [14:6], PLLP [17:16], PLLQ, PLLSRC [22]) · plan values from the clock-tree brief · the lock lab is a simplified, illustrative model with made-up drift numbers · the "general" cards are background knowledge, not checked against a manual.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var NS = 'http://www.w3.org/2000/svg';
+function el(n, a, t) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (t != null) e.textContent = t; return e; }
+function seg(id, cb) {
+  var bs = $(id).querySelectorAll('button');
+  Array.prototype.forEach.call(bs, function (b) {
+    b.onclick = function () { Array.prototype.forEach.call(bs, function (o) { o.setAttribute('aria-pressed', String(o === b)); }); cb(b); };
+  });
+}
+
+/* ---------- 02 lock lab ---------- */
+var Lab = (function () {
+  var api = {};
+  var DT = 0.025, T_END = 60, STEPS = T_END / DT;      /* µs */
+  var SIGMA = 0.6, SLOPE = 3, T_HEAT = 20, GAIN = 0.9; /* made-up: ppm per step, ppm per µs, µs, loop gain */
+  var lock = 1, refMHz = 2, heat = false;
+
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function run(withLock, ref, withHeat) {
+    var r = rng(7), drift = 0, c = 0, theta = 0, prev = 0, tref = 1 / ref, next = tref, e = [], edges = [];
+    for (var i = 0; i < STEPS; i++) {
+      var t = i * DT, g = (r() + r() + r() + r() - 2) * 1.7;       /* roughly gaussian */
+      drift += g * SIGMA;
+      var err = drift + (withHeat && t > T_HEAT ? SLOPE * (t - T_HEAT) : 0) + (withLock ? c : 0);
+      e.push(err); theta += err * DT;
+      if (t + DT >= next - 1e-9) {
+        if (withLock) c -= GAIN * (theta - prev) / tref;           /* subtract most of the last period's mean error */
+        prev = theta; edges.push(t); next += tref;
+      }
+    }
+    return { e: e, edges: edges };
+  }
+  function worst(e, from) { var m = 0; for (var i = Math.floor(from / DT); i < e.length; i++) m = Math.max(m, Math.abs(e[i])); return m; }
+
+  function draw() {
+    var free = run(false, refMHz, heat), lk = run(true, refMHz, heat);
+    var wf = worst(free.e, 10), wl = worst(lk.e, 10);
+    var yMax = Math.max(40, Math.ceil(wf / 20) * 20);
+    var L = 44, R = 8, Tp = 26, B = 190, W = 780 - L - R, H = B - Tp;
+    var X = function (t) { return L + t / T_END * W; }, Y = function (v) { return Tp + H / 2 - v / yMax * (H / 2); };
+    var s = $('svg'); s.textContent = '';
+    s.appendChild(el('line', { x1: L, y1: Y(0), x2: L + W, y2: Y(0), 'class': 'ax' }));
+    s.appendChild(el('line', { x1: L, y1: Tp, x2: L, y2: B, 'class': 'ax' }));
+    [yMax, 0, -yMax].forEach(function (v) { s.appendChild(el('text', { x: L - 5, y: Y(v) + 3, 'text-anchor': 'end' }, (v > 0 ? '+' : '') + v)); });
+    s.appendChild(el('text', { x: 2, y: 12 }, 'error, ppm'));
+    [0, 20, 40, 60].forEach(function (t) { s.appendChild(el('text', { x: X(t), y: B + 28, 'text-anchor': t === 60 ? 'end' : t === 0 ? 'start' : 'middle' }, t + ' µs')); });
+    if (lock) lk.edges.forEach(function (t) { s.appendChild(el('line', { x1: X(t), y1: B + 4, x2: X(t), y2: B + 14, 'class': 'edge' })); });
+    var path = function (e) { var d = ''; for (var i = 0; i < e.length; i += 2) d += (i ? ' L' : 'M') + X(i * DT).toFixed(1) + ' ' + Y(Math.max(-yMax, Math.min(yMax, e[i]))).toFixed(1); return d; };
+    s.appendChild(el('path', { d: path(free.e), 'class': 'free' }));
+    if (lock) s.appendChild(el('path', { d: path(lk.e), 'class': 'lock' }));
+    if (heat) s.appendChild(el('text', { x: X(T_HEAT) + 4, y: Tp + 10, 'class': 'note' }, 'heating starts'));
+    s.appendChild(el('text', { x: X(1), y: Tp + (heat ? 22 : 10), 'class': 'note' }, 'grey: oscillator alone' + (lock ? ' · orange: with PLL' : '')));
+
+    var kHz = function (ppm) { return (ppm * 180 / 1000).toFixed(1); };
+    $('score').innerHTML =
+      '<span class="chip">alone: worst error ' + wf.toFixed(0) + ' ppm = ' + kHz(wf) + ' kHz at 180 MHz</span>' +
+      (lock ? '<span class="chip ok">with PLL: ' + wl.toFixed(1) + ' ppm = ' + kHz(wl) + ' kHz</span><span class="chip">checks every ' + (1 / refMHz).toFixed(1) + ' µs</span>'
+            : '<span class="chip bad">PLL off: nothing pulls it back</span>');
+    api.last = { wf: wf, wl: wl, edges: lk.edges.length };
+  }
+  seg('lockSeg', function (b) { lock = +b.dataset.v; draw(); });
+  seg('refSeg', function (b) { refMHz = +b.dataset.v; draw(); });
+  $('heat').onchange = function () { heat = $('heat').checked; draw(); };
+  draw();
+  api.set = function (l, r, h) { lock = l; refMHz = r; heat = h; draw(); };
+  return api;
+})();
+
+/* ---------- 03 M, N, P ---------- */
+(function () {
+  var HSI = 16;
+  function fmt(x) { return (Math.round(x * 1000) / 1000).toString(); }
+  function draw() {
+    var M = +$('M').value, N = +$('N').value, P = +$('P').value;
+    var ref = HSI / M, vco = ref * N, out = vco / P;
+    var okM = M >= 2 && M <= 63, okN = N >= 50 && N <= 432;
+    var okRef = okM && ref >= 1 && ref <= 2, okVco = okN && vco >= 100 && vco <= 432, okOut = out <= 180;
+    var cell = function (small, val, bad) { return '<div' + (bad ? ' class="bad"' : '') + '><small>' + small + '</small><b>' + val + '</b></div>'; };
+    $('chain').innerHTML =
+      cell('HSI', '16 MHz') + '<i>÷ ' + M + '</i>' + cell('reference', okM ? fmt(ref) + ' MHz' : 'M invalid', !okRef) +
+      '<i>× ' + N + '</i>' + cell('VCO', okN && okM ? fmt(vco) + ' MHz' : 'N invalid', !okVco) +
+      '<i>÷ ' + P + '</i>' + cell('SYSCLK', okM && okN ? fmt(out) + ' MHz' : '—', !okOut);
+    var lo = 0, hi = 500, pc = function (v) { return Math.max(0, Math.min(100, v / hi * 100)); };
+    $('rng').className = 'rng' + (okVco ? '' : ' badpt');
+    $('rng').innerHTML = '<div class="ok" style="left:' + pc(100) + '%;width:' + (pc(432) - pc(100)) + '%"></div><div class="pt" style="left:' + pc(okM && okN ? vco : 0) + '%"></div>';
+    $('rl').innerHTML = '<span style="left:0">0</span><span style="left:' + pc(100) + '%">100</span><span style="left:' + pc(432) + '%">432</span><span style="left:100%">500 MHz</span>';
+    var chip = function (ok, t) { return '<span class="chip ' + (ok ? 'ok' : 'bad') + '">' + t + '</span>'; };
+    $('cscore').innerHTML =
+      chip(okM, 'M 2 to 63') + chip(okRef, 'reference 1 to 2 MHz') + chip(okN, 'N 50 to 432') + chip(okVco, 'VCO 100 to 432 MHz') + chip(okOut, 'SYSCLK ≤ 180 MHz');
+    if (okM && okN) {
+      $('chint').innerHTML = 'The PLL checks the VCO once per reference tick, every <b>' + fmt(1 / ref * 1000) + ' ns</b>. In that time the VCO runs <b>' + N + ' cycles</b> on its own. ' +
+        (ref < 2 && okRef ? 'This is allowed, but the manual recommends 2 MHz "to limit PLL jitter": a longer gap between checks lets the VCO wander farther (see the lock lab). ' : '') +
+        (ref === 2 ? 'This is the 2 MHz the manual recommends. ' : '');
+    } else $('chint').textContent = '';
+    Calc.last = { M: M, N: N, P: P, ref: ref, vco: vco, out: out, okRef: okRef, okVco: okVco, okOut: okOut };
+  }
+  window.Calc = { draw: draw };
+  ['M', 'N', 'P'].forEach(function (id) { $(id).addEventListener('input', function () { Array.prototype.forEach.call($('pre').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', 'false'); }); draw(); }); });
+  seg('pre', function (b) { $('M').value = b.dataset.m; $('N').value = b.dataset.n; $('P').value = b.dataset.p; draw(); });
+  draw();
+})();
+</script>
+</body>
+</html>
