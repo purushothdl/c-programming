@@ -27,6 +27,7 @@ void clock_init(void);
 
 uint32_t clock_sysclk_hz(void);         /* CPU / AHB clock */
 uint32_t clock_pclk1_hz(void);          /* APB1 bus clock: USART2 baud generator */
+uint32_t clock_pclk2_hz(void);          /* APB2 bus clock: SPI1 baud generator */
 uint32_t clock_tim_apb1_hz(void);       /* clock the APB1 timers (TIM2..TIM7, TIM12..14) count from */
 
 #endif

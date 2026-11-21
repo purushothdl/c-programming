@@ -57,6 +57,7 @@ _Static_assert(CFGR_PPRE2_DIV == PPRE2_CODE(APB2_DIV), "PPRE2 code does not matc
 /* Reset state: HSI, every divider /1. Updated at the end of clock_init(). */
 static uint32_t g_sysclk_hz = HSI_HZ;
 static uint32_t g_pclk1_hz = HSI_HZ;
+static uint32_t g_pclk2_hz = HSI_HZ;
 static uint32_t g_tim_apb1_hz = HSI_HZ;
 
 /* A flag that never sets hangs the board here. Recovery: flash again with
@@ -119,6 +120,7 @@ void clock_init(void)
 
     g_sysclk_hz = SYSCLK_HZ;
     g_pclk1_hz = PCLK1_HZ;
+    g_pclk2_hz = PCLK2_HZ;
     g_tim_apb1_hz = TIM_APB1_HZ;
 }
 
@@ -130,6 +132,11 @@ uint32_t clock_sysclk_hz(void)
 uint32_t clock_pclk1_hz(void)
 {
     return g_pclk1_hz;
+}
+
+uint32_t clock_pclk2_hz(void)
+{
+    return g_pclk2_hz;
 }
 
 uint32_t clock_tim_apb1_hz(void)
