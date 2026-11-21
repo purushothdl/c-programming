@@ -33,6 +33,30 @@ void print_dec32(putc_fn put, uint32_t v)
     }
 }
 
+void print_hex8(putc_fn put, uint8_t v)
+{
+    static const char digits[] = "0123456789ABCDEF";
+
+    put('0');
+    put('x');
+    put(digits[v >> 4]);
+    put(digits[v & 0xFu]);
+}
+
+void print_bytes(putc_fn put, const uint8_t *buf, uint32_t n, uint32_t per_row)
+{
+    for (uint32_t i = 0u; i < n; i++) {
+        put(' ');
+        if (i % per_row == 0u) {
+            put(' ');
+        }
+        print_hex8(put, buf[i]);
+        if (i % per_row == per_row - 1u || i == n - 1u) {
+            print_str(put, "\r\n");
+        }
+    }
+}
+
 static int hexval(char c)
 {
     if (c >= '0' && c <= '9') return c - '0';

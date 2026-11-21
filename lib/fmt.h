@@ -16,6 +16,14 @@ void print_str(putc_fn put, const char *s);
 void print_hex32(putc_fn put, uint32_t v);
 void print_dec32(putc_fn put, uint32_t v);
 
+/* "0x" and two hex digits, e.g. 0x9F. */
+void print_hex8(putc_fn put, uint8_t v);
+
+/* n bytes as print_hex8 values, per_row to a line. Each line starts with two
+   spaces, bytes are separated by one space, and every line ends with "\r\n"
+   (including a short last line). */
+void print_bytes(putc_fn put, const uint8_t *buf, uint32_t n, uint32_t per_row);
+
 /* Accepts 0x-prefixed hex or plain decimal. Returns 0 on empty input, bad
    digits, or a value that does not fit in 32 bits; *out is only written on 1. */
 int parse_u32(const char *s, uint32_t *out);

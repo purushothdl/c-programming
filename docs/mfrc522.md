@@ -27,6 +27,7 @@ STM32 side of the SPI link. Its registers are not in the SVD.
 | Page 2: configuration (CRCResultReg, RFCfgReg, TModeReg/TPrescalerReg, TReloadReg) | 9.3.3 | 57–62 |
 | Page 3: test (AutoTestReg, **VersionReg**) | 9.3.4 | 63–68 |
 | Command set (Idle, Mem, CalcCRC, Transmit, Receive, Transceive, MFAuthent, SoftReset) | 10 | 70–73 |
+| **Mem** (FIFO <-> 25-byte internal buffer; survives reset) and **SoftReset** (registers reset, buffer unchanged) | 10.3.1.2, 10.3.1.10 | 71, 73 |
 | Limiting values, operating conditions | 11–12 | 74 |
 | **SPI timing characteristics** | 14.1 | 78 |
 | Application information (antenna circuit) | 15 | 81 |

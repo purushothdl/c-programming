@@ -34,22 +34,13 @@
 
 static uint32_t g_br = SPI_BR_SLOWEST;
 
-static void print_hex8(uint8_t v)
-{
-    static const char hex[] = "0123456789ABCDEF";
-
-    uart_puts("0x");
-    uart_putc(hex[v >> 4]);
-    uart_putc(hex[v & 0xFu]);
-}
-
 static void cmd_version(char *args[])
 {
     (void)args;
     uint8_t v = rc522_read(RC522_REG_VERSION);
 
     uart_puts("VersionReg = ");
-    print_hex8(v);
+    print_hex8(uart_putc, v);
     if (v == 0x91u) {
         uart_puts("  MFRC522 v1.0\r\n");
     } else if (v == 0x92u) {
@@ -69,9 +60,9 @@ static void cmd_read(char *args[])
         uart_puts("usage: read <0-0x3F>\r\n");
         return;
     }
-    print_hex8((uint8_t)reg);
+    print_hex8(uart_putc, (uint8_t)reg);
     uart_puts(" = ");
-    print_hex8(rc522_read((uint8_t)reg));
+    print_hex8(uart_putc, rc522_read((uint8_t)reg));
     uart_puts("\r\n");
 }
 
@@ -86,11 +77,11 @@ static void cmd_write(char *args[])
     }
     rc522_write((uint8_t)reg, (uint8_t)value);
     uart_puts("wrote ");
-    print_hex8((uint8_t)value);
+    print_hex8(uart_putc, (uint8_t)value);
     uart_puts(" to ");
-    print_hex8((uint8_t)reg);
+    print_hex8(uart_putc, (uint8_t)reg);
     uart_puts(", reads back ");
-    print_hex8(rc522_read((uint8_t)reg));
+    print_hex8(uart_putc, rc522_read((uint8_t)reg));
     uart_puts("\r\n");
 }
 

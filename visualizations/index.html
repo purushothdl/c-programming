@@ -83,6 +83,7 @@
   <h2>SPI <span>spi/</span></h2>
   <div class="list">
     <a class="item" href="spi/nss.html"><b>Master, slave and NSS</b><p>Why only the master makes the clock, what the NSS pin means to each side, and how SSM and SSI stop a lone master from faulting. Two boards fight for the bus.</p><span class="src">programs/spi_loopback/main.c · RM0390 §26.3.4-5, §26.3.13</span><span class="st new">new style</span></a>
+    <a class="item" href="spi/rc522-memory.html"><b>RC522 memory: registers, FIFO, internal buffer</b><p>Three separate stores behind one SPI door. Send reads and writes to see which box changes, step through the first lines of the self test, and see how the chip tells an address byte from data.</p><span class="src">lib/rc522.c · MFRC522 datasheet p.10-11, p.29, p.36, p.44, p.70-73</span><span class="st new">new style</span></a>
     <a class="item" href="spi/explorer.html"><b>SPI modes</b><p>Run a transfer in any of the four modes, give the slave the wrong CPHA to break it, and build the matching SPI_CR1 value with the clock speed.</p><span class="src">RM0390 ch. 26 · concept</span><span class="st new">new style</span></a>
   </div>
 </section>

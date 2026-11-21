@@ -32,15 +32,6 @@
 static uint32_t g_br = SPI_BR_SLOWEST;      /* start slow: an 8-channel analyser can follow it */
 static uint32_t g_mode;                     /* bit 1 = CPOL, bit 0 = CPHA */
 
-static void print_hex8(uint8_t v)
-{
-    static const char hex[] = "0123456789ABCDEF";
-
-    uart_puts("0x");
-    uart_putc(hex[v >> 4]);
-    uart_putc(hex[v & 0xFu]);
-}
-
 static void print_sck(void)
 {
     uart_puts("SCK ");
@@ -84,9 +75,9 @@ static void cmd_loop(char *args[])
     uart_puts("/256 bytes matched");
     if (bad != 0u) {
         uart_puts(", first bad: sent ");
-        print_hex8(first_sent);
+        print_hex8(uart_putc, first_sent);
         uart_puts(" got ");
-        print_hex8(first_got);
+        print_hex8(uart_putc, first_got);
     }
     uart_puts("\r\n");
 }
@@ -105,9 +96,9 @@ static void cmd_xfer(char *args[])
     spi_cs_high();
 
     uart_puts("sent ");
-    print_hex8((uint8_t)v);
+    print_hex8(uart_putc, (uint8_t)v);
     uart_puts(" got ");
-    print_hex8(got);
+    print_hex8(uart_putc, got);
     uart_puts("\r\n");
 }
 
