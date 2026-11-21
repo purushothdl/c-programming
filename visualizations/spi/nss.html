@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPI master, slave and NSS, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+[hidden] { display: none !important; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pad { padding: 14px; }
+.lab2 { display: block; font: 500 10px "Inter", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px; }
+.dim { opacity: .35; pointer-events: none; }
+.note2 { font-size: 12px; color: var(--ink-3); margin: 0; }
+
+/* 01 clock owner */
+.boards { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 0; align-items: stretch; }
+.bd { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 12px; }
+.bd h4 { margin: 0 0 2px; font: 500 14px "Inter", sans-serif; display: flex; justify-content: space-between; gap: 8px; }
+.bd h4 em { font: 500 11px "JetBrains Mono", monospace; font-style: normal; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--line); color: var(--ink-3); }
+.bd.m { border-color: var(--ember); }
+.bd.m h4 em { color: var(--ember); border-color: var(--ember); }
+.bd p { margin: 0 0 8px; font-size: 12px; color: var(--ink-3); }
+.cells { display: flex; gap: 3px; }
+.cells span { flex: 1; text-align: center; padding: 6px 0; font: 500 13px "JetBrains Mono", monospace; border: 1px solid var(--line); border-radius: 3px; background: var(--card-2); color: var(--ink-2); }
+.cells span.new { border-color: var(--ok); color: var(--ok); }
+.hexv { font: 400 12px "JetBrains Mono", monospace; color: var(--ink-3); margin-top: 6px; }
+.wires { display: flex; flex-direction: column; justify-content: center; gap: 9px; padding: 0 6px; font: 400 10.5px "JetBrains Mono", monospace; color: var(--ink-3); text-align: center; }
+.wires i { display: block; height: 2px; background: var(--line); position: relative; }
+.wires i.on { background: var(--ember); }
+.log2 { margin: 12px 0 0; padding: 9px 12px; border-left: 3px solid var(--line); background: var(--card-2); font-size: 13px; color: var(--ink-2); min-height: 20px; }
+.log2.bad { border-left-color: var(--bad); }
+.log2.ok { border-left-color: var(--ok); }
+.log2 b { color: var(--ink); font-weight: 500; }
+
+/* 02 NSS mux */
+.ctrls { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 14px; border-bottom: 1px solid var(--line-2); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; border-bottom: 1px solid var(--line-2); background: var(--card-2); align-items: center; }
+.presets .lab2 { margin: 0 6px 0 0; }
+.presets button.bugp { color: var(--bad); }
+.dg2 { padding: 10px 14px 4px; }
+.dg2 svg { width: 100%; height: auto; display: block; }
+.dg2 svg text { font-family: "JetBrains Mono", monospace; fill: var(--ink); }
+.dg2 svg .m { fill: var(--ink-3); }
+.dg2 .bx { fill: var(--card); stroke: var(--line); }
+.dg2 .ln { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.dg2 .ln.on { stroke: var(--ember); stroke-width: 2.6; stroke-dasharray: none; }
+.dg2 .mux { fill: var(--card-2); stroke: var(--ink-3); }
+.dg2 .res.okb { stroke: var(--ok); fill: color-mix(in srgb, var(--ok) 10%, var(--card)); }
+.dg2 .res.badb { stroke: var(--bad); fill: color-mix(in srgb, var(--bad) 10%, var(--card)); }
+.dg2 .res.warnb { stroke: var(--warn); fill: color-mix(in srgb, var(--warn) 10%, var(--card)); }
+.dg2 .res.neutb { stroke: var(--ink-3); fill: var(--card-2); }
+.vd { margin: 4px 14px 14px; padding: 9px 12px; border-left: 3px solid var(--line); font-size: 13px; color: var(--ink-2); max-width: 78ch; }
+.vd.ok { border-left-color: var(--ok); } .vd.bad { border-left-color: var(--bad); } .vd.warn { border-left-color: var(--warn); }
+.vd b { color: var(--ink); font-weight: 500; }
+.vd small { display: block; margin-top: 4px; color: var(--ink-3); font-size: 12px; }
+
+/* 03 story */
+.story { padding: 14px; display: grid; gap: 12px; }
+.sb { display: grid; grid-template-columns: 1fr 150px 1fr; gap: 0; align-items: stretch; }
+.sc { border: 1px solid var(--line); border-radius: 4px; padding: 11px 12px; background: var(--card); }
+.sc.mm { border-color: var(--ember); }
+.sc.off { opacity: .6; }
+.sc h4 { margin: 0 0 8px; font: 500 14px "Inter", sans-serif; display: flex; justify-content: space-between; }
+.sc h4 em { font: 500 11px "JetBrains Mono", monospace; font-style: normal; color: var(--ink-3); }
+.kvs { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font: 400 12px "JetBrains Mono", monospace; }
+.kvs span:nth-child(odd) { color: var(--ink-3); }
+.kvs .hi { color: var(--ok); } .kvs .lo { color: var(--bad); } .kvs .fl { color: var(--warn); }
+.sw { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 8px; text-align: center; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.sw .sck { padding: 5px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.sw .sck.go { border-color: var(--ember); color: var(--ember); }
+.sw .sck.clash { border-color: var(--bad); color: var(--bad); }
+.sw .gp { font-size: 10px; }
+.sdesc { padding: 10px 12px; border-left: 3px solid var(--line); background: var(--card-2); }
+.sdesc b { display: block; font-weight: 500; font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+.sdesc p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.sdesc.bad { border-left-color: var(--bad); } .sdesc.ok { border-left-color: var(--ok); }
+.sdesc small { display: block; margin-top: 4px; color: var(--ink-3); font-size: 11.5px; }
+
+/* 04 table */
+.tw { overflow-x: auto; }
+.tw table td, .tw table th { white-space: nowrap; }
+.tw tr.pick { cursor: pointer; }
+.tw tr.pick:hover td { background: var(--card-2); }
+.tw tr.mine td { background: color-mix(in srgb, var(--ember) 7%, var(--card)); }
+.tw td.res2 { white-space: normal; min-width: 240px; }
+.mono { font-family: "JetBrains Mono", monospace; }
+
+@media (max-width: 760px) {
+  .boards, .sb { grid-template-columns: 1fr; }
+  .wires, .sw { flex-direction: row; padding: 8px 0; }
+  .wires i { flex: 1; }
+  .dg2 svg { min-width: 640px; } .dg2 { overflow-x: auto; }
+}
+</style>
+<script src="../shared/themes.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../index.html">SPI <span>master, slave and NSS</span></a>
+    <a class="l" href="#who">Who clocks</a>
+    <a class="l" href="#nss">NSS, SSM, SSI</a>
+    <a class="l" href="#story">Two masters</a>
+    <a class="l" href="#table">Cases</a>
+    <button class="tg" id="theme"></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<header style="padding:48px 0 8px">
+  <div class="eyebrow">programs/spi_loopback/main.c · spi_configure()</div>
+  <h1 style="margin-top:14px;font-size:40px">One wire, two meanings. <em>NSS means the opposite to a master and a slave.</em></h1>
+  <p class="serif" style="margin-top:16px;max-width:34em">Why a master is special, what the NSS pin tells each side, and why this program sets <code>SSM</code> and <code>SSI</code> so the SPI block stops watching it.</p>
+</header>
+
+<section id="who">
+  <div class="sh"><div class="eyebrow">01 · the master's one privilege</div><h2>Only the master makes the clock</h2>
+    <p>A slave cannot move a single bit by itself. Bits shift only when SCK pulses, and only the master drives SCK. Try to make the slave send something on its own.</p></div>
+  <div class="win"><div class="top"><span class="tab" aria-selected="true">two shift registers in a ring</span></div>
+    <div class="pad">
+      <div class="boards">
+        <div class="bd" id="bdA"><h4>Board A <em id="rA"></em></h4><p id="pA"></p><div class="cells" id="cA"></div><div class="hexv" id="hA"></div></div>
+        <div class="wires"><span>MOSI →</span><i id="w1"></i><span>← MISO</span><i id="w2"></i><span>SCK <b id="sckn">0</b></span><i id="w3"></i></div>
+        <div class="bd" id="bdB"><h4>Board B <em id="rB"></em></h4><p id="pB"></p><div class="cells" id="cB"></div><div class="hexv" id="hB"></div></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn sm" id="alone">Slave tries to send alone</button>
+        <button class="btn sm dark" id="clk">Master clocks 8 times</button>
+        <button class="btn sm ghost" id="swap">Swap who is master</button>
+        <button class="btn sm ghost" id="reset">Reset</button>
+      </div>
+      <div class="log2" id="log1">Each board has a byte loaded. Nothing moves until the master clocks.</div>
+      <p class="note2" style="margin-top:8px">So B can send data to A while A is master: A's clock pulls B's byte across. What B cannot do is choose <i>when</i>. That is why devices that need to speak first use a separate "data ready" wire, or take the bus themselves (section 03).</p>
+    </div>
+  </div>
+</section>
+
+<section id="nss">
+  <div class="sh"><div class="eyebrow">02 · the NSS signal inside the chip</div><h2>Where NSS comes from, and what it does</h2>
+    <p>The SPI logic looks at one internal signal, <b>NSS inside</b>. <code>SSM</code> picks its source: the pin, or the <code>SSI</code> bit. Then the role decides what that signal means. Set the bits and watch the result, or click a preset.</p></div>
+  <div class="win"><div class="top"><span class="tab" aria-selected="true">SPIx_CR1 + CR2 · NSS logic</span></div>
+    <div class="presets" id="presets"><span class="lab2">presets</span></div>
+    <div class="ctrls">
+      <div><span class="lab2">MSTR · role</span><div class="seg" id="sg-mstr"></div></div>
+      <div><span class="lab2">SSM · source of NSS inside</span><div class="seg" id="sg-ssm"></div></div>
+      <div id="g-ssi"><span class="lab2">SSI · the software value</span><div class="seg" id="sg-ssi"></div></div>
+      <div id="g-ssoe"><span class="lab2">SSOE · NSS as output (CR2 bit 2)</span><div class="seg" id="sg-ssoe"></div></div>
+      <div id="g-pin"><span class="lab2">what the NSS pin sees</span><div class="seg" id="sg-pin"></div></div>
+    </div>
+    <div class="dg2"><svg id="dg" viewBox="0 0 740 210" role="img" aria-label="NSS source selection and result"></svg></div>
+    <div class="vd" id="vd"></div>
+  </div>
+</section>
+
+<section id="story">
+  <div class="sh"><div class="eyebrow">03 · why the pin exists</div><h2>Two boards that can both be master</h2>
+    <p>The manual's multi-master pattern: both boards idle as slaves. A board that wants the bus turns itself into a master and pulls the other board's NSS low through a GPIO. Step through three cases.</p></div>
+  <div class="win">
+    <div class="top" id="stabs"></div>
+    <div class="story">
+      <div class="sb">
+        <div class="sc" id="sA"></div>
+        <div class="sw"><div class="gp" id="gpA"></div><div class="sck" id="sckw"></div><div class="gp" id="gpB"></div></div>
+        <div class="sc" id="sB"></div>
+      </div>
+      <div class="sdesc" id="sdesc"></div>
+      <div class="row"><button class="btn sm ghost" id="sprev">← Back</button><button class="btn sm dark" id="snext">Next →</button><button class="btn sm ghost" id="srst">Reset</button><span class="note2" id="sctr"></span></div>
+    </div>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sh"><div class="eyebrow">04 · the cases side by side</div><h2>Which settings for which wiring</h2>
+    <p>Click a row to load it into the logic above. The highlighted row is what <code>spi_configure()</code> writes (<code>programs/spi_loopback/main.c:79</code>: <code>MSTR | SSM | SSI</code>, SSOE left at 0).</p></div>
+  <div class="card tw"><table id="tbl"></table></div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">05 · easy to get wrong</div><h2>Gotchas</h2></div>
+  <div class="gl">
+    <div><b>SSI = 0 on a master is a fault</b>The manual says a master with its internal NSS low gets a mode fault, "NSS pin in hardware mode, or SSI bit in software mode". No wire needed: a wrong SSI alone does it.</div>
+    <div><b>PB6 is not NSS</b>The program's chip select is a plain GPIO. The SPI1 NSS pin is PA4 or PA15 (AF5). They never interact when SSM = 1.</div>
+    <div><b>A fault locks the way back</b>After MODF, read SR, then write CR1, with NSS high. The hardware will not let SPE or MSTR be set while MODF is still set.</div>
+    <div><b>SSOE is for one slave only</b>With SSM = 0 and SSOE = 1 the master drives NSS low whenever SPE = 1. Fine for one slave, no use for several.</div>
+    <div><b>Shared MISO needs care</b>Slaves that share one MISO wire must set the pin to alternate-function open-drain, and an unselected slave releases it.</div>
+    <div><b>SSM = 1 frees the NSS pin</b>The pin can then be used for something else, because the chip no longer reads it.</div>
+  </div>
+</section>
+
+<footer>Source: RM0390 §26.3.4 multimaster (p. 831), §26.3.5 NSS pin management and Figure 309 (p. 832-833), §26.3.13 mode fault (p. 843); STM32F446 datasheet Table 11 (p. 58) for SPI1_NSS on PA4 / PA15; SVD bit positions for SPI1_CR1 · programs/spi_loopback/main.c:79-83 ·
+  Simplified: only the NSS logic is modelled, not timing. "Floating" is shown as undefined because the manual does not say what a floating NSS input reads. The two-board cases are illustrations of the manual's pattern, not measured behaviour.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function hex(v) { return '0x' + ('0' + v.toString(16).toUpperCase()).slice(-2); }
+  function bits(v, fresh) {
+    var s = '';
+    for (var i = 7; i >= 0; i--) s += '<span' + (fresh ? ' class="new"' : '') + '>' + ((v >> i) & 1) + '</span>';
+    return s;
+  }
+
+  /* ---------- 01: the clock owner ---------- */
+  var R = { a: 0xA5, b: 0x3C, master: 'A', n: 0, busy: false };
+  function drawRing(fresh) {
+    var ma = R.master === 'A';
+    $('bdA').className = 'bd' + (ma ? ' m' : ''); $('bdB').className = 'bd' + (ma ? '' : ' m');
+    $('rA').textContent = ma ? 'master' : 'slave'; $('rB').textContent = ma ? 'slave' : 'master';
+    $('pA').textContent = ma ? 'drives SCK, starts every transfer' : 'only follows SCK';
+    $('pB').textContent = ma ? 'only follows SCK' : 'drives SCK, starts every transfer';
+    $('cA').innerHTML = bits(R.a, fresh); $('cB').innerHTML = bits(R.b, fresh);
+    $('hA').textContent = hex(R.a); $('hB').textContent = hex(R.b);
+    $('sckn').textContent = R.n;
+    ['w1', 'w2', 'w3'].forEach(function (w) { $(w).className = R.busy ? 'on' : ''; });
+  }
+  function log1(t, c) { var e = $('log1'); e.className = 'log2 ' + (c || ''); e.innerHTML = t; }
+  function resetRing() { R.a = 0xA5; R.b = 0x3C; R.n = 0; R.busy = false; drawRing(false); log1('Each board has a byte loaded. Nothing moves until the master clocks.'); }
+  $('alone').onclick = function () {
+    if (R.busy) return;
+    var sl = R.master === 'A' ? 'B' : 'A', v = R.master === 'A' ? R.b : R.a;
+    log1('Board ' + sl + ' has <b>' + hex(v) + '</b> ready, but SCK has no edges, so <b>not one bit moves</b>. The slave can only wait.', 'bad');
+  };
+  $('clk').onclick = function () {
+    if (R.busy) return;
+    R.busy = true; R.n = 0; var i = 0;
+    var t = setInterval(function () {
+      var m = R.master === 'A' ? R.a : R.b, s = R.master === 'A' ? R.b : R.a;
+      var nm = ((m << 1) | (s >> 7)) & 255, ns = ((s << 1) | (m >> 7)) & 255;
+      if (R.master === 'A') { R.a = nm; R.b = ns; } else { R.b = nm; R.a = ns; }
+      R.n++; i++; drawRing(false);
+      if (i === 8) {
+        clearInterval(t); R.busy = false; drawRing(true);
+        log1('8 clock pulses, 8 bits each way. The bytes <b>swapped</b>: A now holds ' + hex(R.a) + ', B holds ' + hex(R.b) + '. The master asked, the slave answered in the same breath.', 'ok');
+      }
+    }, 140);
+  };
+  $('swap').onclick = function () { if (R.busy) return; R.master = R.master === 'A' ? 'B' : 'A'; R.n = 0; drawRing(false); log1('Roles swapped. Now ' + R.master + ' owns the clock.'); };
+  $('reset').onclick = function () { if (R.busy) return; R.master = 'A'; resetRing(); };
+  drawRing(false);
+
+  /* ---------- 02: the NSS logic ---------- */
+  var S = { mstr: 1, ssm: 1, ssi: 1, ssoe: 0, pin: 'high' };
+  var PRESETS = [
+    { id: 'lone-m', name: 'lone master (this board)', s: { mstr: 1, ssm: 1, ssi: 1, ssoe: 0, pin: 'high' }, mine: true, wiring: 'one master, no NSS wire' },
+    { id: 'multi', name: 'multi-master node', s: { mstr: 1, ssm: 0, ssi: 1, ssoe: 0, pin: 'high' }, wiring: 'NSS wired to the other board' },
+    { id: 'nssout', name: 'master with NSS output', s: { mstr: 1, ssm: 0, ssi: 1, ssoe: 1, pin: 'high' }, wiring: 'NSS wired to ONE slave' },
+    { id: 'lone-s', name: 'lone slave', s: { mstr: 0, ssm: 1, ssi: 0, ssoe: 0, pin: 'high' }, wiring: 'only slave, no CS wire' },
+    { id: 'shared', name: 'slave on a shared bus', s: { mstr: 0, ssm: 0, ssi: 1, ssoe: 0, pin: 'low' }, wiring: 'CS wire from the master' },
+    { id: 'bug-ssi', name: 'bug: master with SSI = 0', s: { mstr: 1, ssm: 1, ssi: 0, ssoe: 0, pin: 'high' }, bug: true, wiring: 'SSI forgotten' },
+    { id: 'bug-float', name: 'bug: master, NSS pin unwired', s: { mstr: 1, ssm: 0, ssi: 1, ssoe: 0, pin: 'float' }, bug: true, wiring: 'SSM left at 0' }
+  ];
+
+  function calc(s) {
+    var o = { src: s.ssm ? 'ssi' : (s.mstr && s.ssoe ? 'out' : 'pin') };
+    o.inside = o.src === 'ssi' ? (s.ssi ? 'high' : 'low') : o.src === 'pin' ? s.pin : null;
+    if (o.src === 'out') {
+      o.kind = 'ok'; o.tag = 'NSS = output';
+      o.html = '<b>NSS is an output.</b> The hardware drives it low from the moment SPE = 1 until SPE = 0, so it selects one slave for you. The pin is not watched, so no fault can come from it.';
+      o.small = 'RM0390 p. 832: SSM = 0, SSOE = 1, master only.';
+    } else if (o.inside === 'float') {
+      o.kind = 'warn'; o.tag = 'undefined';
+      o.html = s.mstr
+        ? '<b>Nothing drives the pin, so the value is undefined.</b> The master watches this signal. If it happens to read low, the chip takes it as another master and faults; if high, it carries on. A test that passes now can fail later.'
+        : '<b>Nothing drives the pin, so the value is undefined.</b> The slave may think it is selected or not, at random.';
+      o.small = 'The manual does not say what a floating input reads. That is the point: do not leave it to chance.';
+    } else if (s.mstr) {
+      if (o.inside === 'high') {
+        o.kind = 'ok'; o.tag = 'stays master';
+        o.html = o.src === 'ssi'
+          ? '<b>SSI = 1 says "nobody has selected me".</b> The chip stays master and ignores the NSS pin completely.'
+          : '<b>NSS high: nobody else is master.</b> Stays master. If the pin ever goes low, it will fault.';
+        o.small = o.src === 'ssi' ? 'RM0390 p. 831, Figure 307 note 1: SSM = 1, SSI = 1 for a master that does not use NSS.' : 'RM0390 Figure 309: Vdd on NSS, master mode = OK.';
+      } else {
+        o.kind = 'bad'; o.tag = 'MODF fault';
+        o.html = '<b>Mode fault (MODF).</b> The master sees itself selected, so it assumes another master. It sets <code>MODF</code>, clears <code>SPE</code> (all output stops, SPI off) and clears <code>MSTR</code> (now a slave).' +
+                 (o.src === 'ssi' ? ' There is no wire here: the <b>SSI bit alone</b> caused it.' : '');
+        o.small = 'Recover: read SR, then write CR1, with NSS high. SPE and MSTR cannot be set while MODF is set. RM0390 p. 843.';
+      }
+    } else {
+      if (o.inside === 'low') {
+        o.kind = 'ok'; o.tag = 'selected';
+        o.html = '<b>Selected.</b> The slave takes part: its MISO output is on and it shifts bits with every SCK edge.' +
+                 (o.src === 'ssi' ? ' With SSM = 1 and SSI = 0 it is <b>always</b> selected, so no CS wire is needed.' : ' This is the shared-bus case: the master pulls this chip\'s CS low to say "you".');
+        o.small = 'RM0390 Figure 309: Vss on NSS, slave mode = Active.';
+      } else {
+        o.kind = 'neutral'; o.tag = 'ignored';
+        o.html = '<b>Not selected.</b> The slave ignores SCK and keeps MISO off the bus.' +
+                 (o.src === 'ssi' ? ' SSI = 1 in software mode means it is <b>never</b> selected, which is rarely what you want.' : ' It waits for its own CS line to go low.');
+        o.small = 'RM0390 Figure 309: Vdd on NSS, slave mode = Non active.';
+      }
+    }
+    return o;
+  }
+
+  function mkSeg(id, opts, key) {
+    var el = $(id); el.innerHTML = '';
+    opts.forEach(function (o) {
+      var b = document.createElement('button'); b.textContent = o[1]; b.dataset.v = o[0];
+      b.onclick = function () { S[key] = typeof o[0] === 'number' ? o[0] : o[0]; draw(); };
+      el.appendChild(b);
+    });
+  }
+  mkSeg('sg-mstr', [[1, '1 master'], [0, '0 slave']], 'mstr');
+  mkSeg('sg-ssm', [[0, '0 the NSS pin'], [1, '1 the SSI bit']], 'ssm');
+  mkSeg('sg-ssi', [[1, '1 high'], [0, '0 low']], 'ssi');
+  mkSeg('sg-ssoe', [[0, '0 input'], [1, '1 output']], 'ssoe');
+  mkSeg('sg-pin', [['high', 'high'], ['low', 'low'], ['float', 'unwired']], 'pin');
+
+  var pr = $('presets');
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.className = 'btn sm' + (p.bug ? ' ghost bugp' : ' ghost'); b.textContent = p.name;
+    b.onclick = function () { S = Object.assign({}, p.s); draw(); };
+    pr.appendChild(b);
+  });
+
+  function draw() {
+    var o = calc(S);
+    ['sg-mstr', 'sg-ssm', 'sg-ssi', 'sg-ssoe', 'sg-pin'].forEach(function (id) {
+      var key = id.slice(3);
+      Array.prototype.forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.v) === String(S[key])); });
+    });
+    $('g-ssi').className = S.ssm ? '' : 'dim';
+    $('g-pin').className = (S.ssm || o.src === 'out') ? 'dim' : '';
+    $('g-ssoe').className = (!S.mstr || S.ssm) ? 'dim' : '';
+
+    var pinTxt = o.src === 'out' ? 'output, low' : S.pin === 'float' ? 'floating' : S.pin;
+    var pinOn = o.src === 'pin', ssiOn = o.src === 'ssi';
+    var rc = o.kind === 'ok' ? 'okb' : o.kind === 'bad' ? 'badb' : o.kind === 'warn' ? 'warnb' : 'neutb';
+    var inTxt = o.inside || 'n/a';
+    $('dg').innerHTML =
+      '<rect class="bx" x="10" y="22" width="190" height="56" rx="4"/><text x="22" y="44" font-size="12">NSS pin</text><text class="m" x="22" y="62" font-size="11">PA4 / PA15 · ' + (S.ssm ? 'ignored' : pinTxt) + '</text>' +
+      '<rect class="bx" x="10" y="132" width="190" height="56" rx="4"/><text x="22" y="154" font-size="12">SSI bit (CR1 bit 8)</text><text class="m" x="22" y="172" font-size="11">value ' + S.ssi + (S.ssm ? '' : ' · not used') + '</text>' +
+      '<path class="ln' + (pinOn ? ' on' : '') + '" d="M200 50 H250 V78 H290"/>' +
+      '<path class="ln' + (ssiOn ? ' on' : '') + '" d="M200 160 H250 V132 H290"/>' +
+      '<polygon class="mux" points="290,56 350,80 350,130 290,154"/>' +
+      '<text x="296" y="76" class="m" font-size="10">0</text><text x="296" y="140" class="m" font-size="10">1</text>' +
+      '<text x="318" y="110" font-size="11" text-anchor="middle">SSM</text><text x="318" y="124" class="m" font-size="10" text-anchor="middle">= ' + S.ssm + '</text>' +
+      '<path class="ln' + (o.inside ? ' on' : '') + '" d="M350 105 H410"/>' +
+      '<rect class="bx" x="410" y="70" width="140" height="70" rx="4"/><text x="422" y="94" font-size="12">NSS inside</text><text x="422" y="120" font-size="17" style="font-weight:500">' + inTxt + '</text>' +
+      '<path class="ln' + (o.inside ? ' on' : '') + '" d="M550 105 H590"/>' +
+      '<rect class="res ' + rc + '" x="590" y="60" width="140" height="90" rx="4" stroke-width="1.5"/>' +
+      '<text x="602" y="84" class="m" font-size="10">' + (S.mstr ? 'AS MASTER' : 'AS SLAVE') + '</text>' +
+      '<text x="602" y="112" font-size="14" style="font-weight:500">' + o.tag + '</text>' +
+      (o.src === 'out' ? '<text x="602" y="134" class="m" font-size="10">pin is driven by HW</text>' : '');
+    var v = $('vd'); v.className = 'vd ' + (o.kind === 'neutral' ? '' : o.kind);
+    v.innerHTML = o.html + '<small>' + o.small + '</small>';
+    Array.prototype.forEach.call(document.querySelectorAll('#tbl tr.pick'), function (tr) { /* keep rows static */ });
+  }
+
+  /* ---------- 04: table from the same presets ---------- */
+  (function () {
+    var t = '<tr><th>case</th><th>wiring</th><th>MSTR</th><th>SSM</th><th>SSI</th><th>SSOE</th><th>result</th></tr>';
+    PRESETS.forEach(function (p) {
+      var o = calc(p.s);
+      var ssiTxt = p.s.ssm ? p.s.ssi : '(pin)';
+      var ssoeTxt = p.s.mstr && !p.s.ssm ? p.s.ssoe : '–';
+      var res = o.tag + ' · ' + (o.kind === 'bad' ? 'fault' : o.kind === 'warn' ? 'chance' : 'ok');
+      t += '<tr class="pick' + (p.mine ? ' mine' : '') + '" data-id="' + p.id + '"><td>' + p.name + (p.mine ? ' ◀ main.c' : '') + '</td><td>' + p.wiring + '</td><td class="mono">' + p.s.mstr + '</td><td class="mono">' + p.s.ssm + '</td><td class="mono">' + ssiTxt + '</td><td class="mono">' + ssoeTxt + '</td><td class="res2">' + res + '</td></tr>';
+    });
+    $('tbl').innerHTML = t;
+    Array.prototype.forEach.call(document.querySelectorAll('#tbl tr.pick'), function (tr) {
+      tr.onclick = function () {
+        var p = PRESETS.filter(function (x) { return x.id === tr.dataset.id; })[0];
+        S = Object.assign({}, p.s); draw(); $('nss').scrollIntoView({ behavior: 'smooth' });
+      };
+    });
+  })();
+  draw();
+
+  /* ---------- 03: two-board story ---------- */
+  // each step: A and B = {role, spe, nss, modf}, sck = idle|A|B|both, gpA/gpB = level of the GPIO each board drives at the other's NSS
+  var Hs = 'high', Ls = 'low';
+  function st(ra, rb, na, nb, sck, gpA, gpB, title, desc, kind, ref, spea, speb, ma, mb) {
+    return { A: { role: ra, nss: na, spe: spea === undefined ? 1 : spea, modf: ma || 0 }, B: { role: rb, nss: nb, spe: speb === undefined ? 1 : speb, modf: mb || 0 }, sck: sck, gpA: gpA, gpB: gpB, title: title, desc: desc, kind: kind || '', ref: ref || '' };
+  }
+  var CASES = [
+    { tab: 'taking turns', steps: [
+      st('slave', 'slave', Hs, Hs, 'idle', Hs, Hs, 'Idle: both are slaves', 'Both boards wait with MSTR = 0. Both NSS pins are high, so nobody is selected. Nobody drives SCK.', '', 'RM0390 p. 831: "both stay at slave mode by default".'),
+      st('slave', 'master', Hs, Hs, 'idle', Hs, Hs, 'B wants the bus: it becomes master', 'B sets MSTR = 1. It watches its own NSS: high, so no other master. A is untouched.', '', 'RM0390 p. 831: "it switches itself into master mode".'),
+      st('slave', 'master', Ls, Hs, 'idle', Hs, Ls, 'B pulls A\'s NSS low through a GPIO', 'For A (a slave) low means "selected": it turns its MISO output on and starts listening.', 'ok', 'RM0390 p. 831 and Figure 308 note 1.'),
+      st('slave', 'master', Ls, Hs, 'B', Hs, Ls, 'B clocks: the bytes swap', 'Only B drives SCK, so there is no clash. A is selected and answers in the same 8 pulses.', 'ok', 'Section 01 above shows this swap.'),
+      st('slave', 'slave', Hs, Hs, 'idle', Hs, Hs, 'Session over: back to idle', 'B releases the GPIO (A\'s NSS goes high) and clears MSTR. Both are passive slaves again.', 'ok', 'RM0390 p. 831: "returns back to passive slave mode".')
+    ] },
+    { tab: 'both ask at once', bug: true, steps: [
+      st('slave', 'slave', Hs, Hs, 'idle', Hs, Hs, 'Idle: both are slaves', 'Same start as before.', '', ''),
+      st('master', 'master', Hs, Hs, 'idle', Hs, Hs, 'Both decide to take the bus', 'Both set MSTR = 1 at about the same time. Each checks its own NSS: still high, so each thinks it is alone.', '', ''),
+      st('master', 'master', Ls, Ls, 'idle', Ls, Ls, 'Each pulls the other\'s NSS low', 'Now each master sees its own NSS low: "another master has selected me".', 'bad', 'RM0390 Figure 309: Vss on NSS, master mode = Conflict.'),
+      st('slave', 'slave', Ls, Ls, 'idle', Ls, Ls, 'Both fault and step back', 'Each sets MODF, clears SPE (output stops) and clears MSTR. Nobody drove SCK, nothing was corrupted. Software retries later, with different delays on each board.', 'ok', 'RM0390 p. 843 (MODF), p. 832 (retry with different time-outs).', 0, 0, 1, 1)
+    ] },
+    { tab: 'no check (SSM=1, SSI=1)', bug: true, steps: [
+      st('slave', 'slave', Hs, Hs, 'idle', Hs, Hs, 'Both boards ignore their NSS pin', 'Both set SSM = 1 and SSI = 1 ("nobody selects me"), as this program does. Fine for one master. Here there are two.', '', ''),
+      st('master', 'master', Hs, Hs, 'idle', Hs, Hs, 'Both decide to take the bus', 'Both set MSTR = 1. Each board\'s NSS pin is no longer read, so nothing can warn it.', '', ''),
+      st('master', 'master', Hs, Hs, 'both', Hs, Hs, 'Both drive SCK at once', 'Two outputs on one wire, nothing detects it, nothing stops it. Data is garbage and the software has no flag to tell it why. This is the cost of switching the pin off, and why it is only right when you are sure there is one master.', 'bad', 'Why RM0390 p. 831 calls NSS the conflict detector.')
+    ] }
+  ];
+  var C = 0, K = 0;
+  function lvl(x) { return '<span class="' + (x === 'high' ? 'hi' : 'lo') + '">' + x + '</span>'; }
+  function board(id, name, b, ssmOn) {
+    var m = b.role === 'master';
+    var nssTxt = ssmOn ? '<span class="fl">ignored (SSM=1)</span>' : lvl(b.nss);
+    $(id).className = 'sc' + (m ? ' mm' : '') + (b.spe ? '' : ' off');
+    $(id).innerHTML = '<h4>' + name + '<em>' + b.role + '</em></h4><div class="kvs"><span>MSTR</span><span>' + (m ? 1 : 0) + '</span><span>SPE</span><span>' + b.spe + '</span><span>NSS pin</span><span>' + nssTxt + '</span><span>MODF</span><span class="' + (b.modf ? 'lo' : '') + '">' + b.modf + '</span></div>';
+  }
+  function drawStory() {
+    var cs = CASES[C], s = cs.steps[K], ssmOn = C === 2;
+    board('sA', 'Board A', s.A, ssmOn); board('sB', 'Board B', s.B, ssmOn);
+    $('gpA').innerHTML = 'A\'s GPIO → B\'s NSS: ' + lvl(s.gpA);
+    $('gpB').innerHTML = 'B\'s GPIO → A\'s NSS: ' + lvl(s.gpB);
+    var sw = $('sckw');
+    sw.className = 'sck' + (s.sck === 'both' ? ' clash' : s.sck !== 'idle' ? ' go' : '');
+    sw.textContent = s.sck === 'idle' ? 'SCK idle' : s.sck === 'both' ? 'SCK: A and B both drive it' : 'SCK driven by ' + s.sck;
+    var d = $('sdesc'); d.className = 'sdesc ' + s.kind;
+    d.innerHTML = '<b>' + (K + 1) + '. ' + s.title + '</b><p>' + s.desc + '</p>' + (s.ref ? '<small>' + s.ref + '</small>' : '');
+    $('sctr').textContent = 'step ' + (K + 1) + ' of ' + cs.steps.length;
+    $('sprev').disabled = K === 0; $('snext').disabled = K === cs.steps.length - 1;
+    Array.prototype.forEach.call($('stabs').children, function (t, i) { t.setAttribute('aria-selected', i === C); });
+  }
+  CASES.forEach(function (c, i) {
+    var b = document.createElement('button'); b.className = 'tab' + (c.bug ? ' bug' : ''); b.setAttribute('role', 'tab'); b.textContent = c.tab;
+    b.onclick = function () { C = i; K = 0; drawStory(); };
+    $('stabs').appendChild(b);
+  });
+  $('sprev').onclick = function () { if (K > 0) { K--; drawStory(); } };
+  $('snext').onclick = function () { if (K < CASES[C].steps.length - 1) { K++; drawStory(); } };
+  $('srst').onclick = function () { K = 0; drawStory(); };
+  drawStory();
+})();
+</script>
+</body>
+</html>
