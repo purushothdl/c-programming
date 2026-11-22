@@ -50,7 +50,7 @@
 
 <header class="hero">
   <div>
-    <div class="eyebrow">lib/uart.c · UART_BRR · USART2 at 16 MHz</div>
+    <div class="eyebrow">lib/core/uart.c · UART_BRR · USART2 at 16 MHz</div>
     <h1 style="margin-top:14px">No shared clock. <em>So how does the receiver stay in step?</em></h1>
     <p class="serif">The receiver times every bit with its own clock. If that clock is a little off, the sample point slides across the bit. It restarts on every start bit, so the slide only has 10 bits to add up. Drag the error and watch where the samples land.</p>
     <div class="cta">
@@ -121,7 +121,7 @@
   </div>
 </section>
 
-<footer>Source: lib/uart.c lines 6–9 and 33 · RM0390 §25.4.3–25.4.5, USART_BRR (SVD: DIV_Mantissa [15:4], DIV_Fraction [3:0]) · the sample-point model is a simplified calculation that ignores start-edge detection delay.</footer>
+<footer>Source: lib/core/uart.c lines 6–9 and 33 · RM0390 §25.4.3–25.4.5, USART_BRR (SVD: DIV_Mantissa [15:4], DIV_Fraction [3:0]) · the sample-point model is a simplified calculation that ignores start-edge detection delay.</footer>
 </main>
 
 <script src="../shared/theme.js"></script>
@@ -135,7 +135,7 @@ var pct = function (x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(
   var CLK = 16e6, BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
   var sel = 4, other = 0;
   var rows = BAUDS.map(function (b) {
-    var brr = Math.floor((CLK + Math.floor(b / 2)) / b);            /* UART_BRR in lib/uart.c */
+    var brr = Math.floor((CLK + Math.floor(b / 2)) / b);            /* UART_BRR in lib/core/uart.c */
     var actual = CLK / brr;
     return { baud: b, brr: brr, man: brr >> 4, frac: brr & 15, actual: actual, err: (actual - b) / b * 100, tol: (brr & 15) ? 3.33 : 3.75 };
   });

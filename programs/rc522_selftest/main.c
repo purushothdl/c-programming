@@ -18,7 +18,7 @@
  *   version       VersionReg (0x91 = v1.0, 0x92 = v2.0)
  *   speed <3-7>   SPI rate, 3 = 5.6 MHz ... 7 = 351 kHz
  *
- * The 25-byte internal buffer (see docs/mfrc522.md, datasheet p.71 and p.73):
+ * The 25-byte internal buffer (see docs/components/mfrc522.md, datasheet p.71 and p.73):
  *   memread       copy the buffer out through the FIFO and print it
  *   memfill <n>   write n, n+1, ... n+24 into the buffer
  *   memtest       read after reset, write a pattern, read back, soft reset,

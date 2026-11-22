@@ -53,7 +53,7 @@ The templates are defaults, not requirements. Before building:
 
 ## Workflow
 
-1. **Read the source** (`programs/<name>/…`, `lib/*.c`). Note constants, ISR logic, init order, and comments that give reasons. Line numbers move: always re-read the file now, never reuse numbers from an old page. Get numbers with `grep -n`, not from memory.
+1. **Read the source** (`programs/<name>/…`, `lib/core/*.c`, `lib/devices/*.c`). Note constants, ISR logic, init order, and comments that give reasons. Line numbers move: always re-read the file now, never reuse numbers from an old page. Get numbers with `grep -n`, not from memory.
 2. **Verify facts first**, before writing widget data:
    - Register names, addresses, bit positions: SVD (absolute path `…/c-programming/svd/stm32f446re.svd`, device name `STM32F446`). Never write a bit position from memory.
    - Tables and sequences (filter tables, enable order, flag-clear rules, tolerance tables): RM0390 or PM0214 via `pdf-mcp`, starting at `docs/contents.md`. Keep the page number and cite it on the page.

@@ -44,7 +44,7 @@
 
 <header class="hero">
   <div>
-    <div class="eyebrow">programs/tim_pwm_fade/main.c · lib/pwm.c</div>
+    <div class="eyebrow">programs/tim_pwm_fade/main.c · lib/core/pwm.c</div>
     <h1 style="margin-top:14px">The duty climbs in straight steps. <em>The light does not.</em></h1>
     <p class="serif">TIM2 makes a 1 kHz square wave on PA5, so the LED never flickers. Every 50 ms main adds 25 to CCR1: 0 to 1000 in 2.05 s, then it starts again. The duty is linear. What your eye receives is a curve.</p>
     <div class="cta">
@@ -125,13 +125,13 @@
       <div class="warnbox" id="rampwarn">This step does not divide 1000, so the last value lands below 100 %. The LED never reaches full brightness.</div>
     </div>
     <div class="card">
-      <h3>What stays fixed <span>lib/pwm.c</span></h3>
+      <h3>What stays fixed <span>lib/core/pwm.c</span></h3>
       <div class="kv" id="kv-fixed"></div>
       <p class="hint" style="margin-top:10px">The fader only moves <code>CCR1</code>. PSC, ARR and the PWM mode are set once in <code>pwm_init</code>. The pin path (compare → OC1REF → CC1E → PA5) is on the <a href="channels.html">channels page</a>.</p>
     </div>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Why the new duty waits for the wrap <span>lib/pwm.c · OC1PE</span></h3>
+    <h3>Why the new duty waits for the wrap <span>lib/core/pwm.c · OC1PE</span></h3>
     <p style="margin:0 0 8px">With <code>OC1PE = 1</code>, a write to <code>CCR1</code> goes into the preload register and is copied to the active register at the next update event. Without it, the write takes effect at once and can end a pulse early (RM0390 p. 558). That one bit is why a fade never glitches a period.</p>
     <div class="out" style="margin:0">TIM2-&gt;CCMR1 |= ... | TIM_CCMR1_OC1PE;</div>
   </div>
@@ -145,11 +145,11 @@
     <div><b>There is no fade down</b>The inner loop ends and the next pass writes 0. Full to off in one 50 ms step — the jump at the top of every cycle.</div>
     <div><b>Preload keeps pulses whole</b>With OC1PE = 1 the new duty is copied at the update event. Without it, a write can end a pulse early or late.</div>
     <div><b>Linear duty, curved light</b>At 2.5 % the eye already sees about 19 % of full. Most of the visible change happens in the first half.</div>
-    <div><b>PA5 is owned</b><code>lib/pwm.c</code> owns TIM2 and PA5. Reconfiguring either elsewhere breaks the fade silently.</div>
+    <div><b>PA5 is owned</b><code>lib/core/pwm.c</code> owns TIM2 and PA5. Reconfiguring either elsewhere breaks the fade silently.</div>
   </div>
 </section>
 
-<footer>Source: programs/tim_pwm_fade/main.c (lines 32–43), lib/pwm.c (lines 28–62), lib/pwm.h · RM0390 §17.4.7 p. 558 (OC1PE), §17.3.9 p. 531 (PWM mode) · SVD: svd/stm32f446re.svd (TIM2, GPIOA)</footer>
+<footer>Source: programs/tim_pwm_fade/main.c (lines 32–43), lib/core/pwm.c (lines 28–62), lib/core/pwm.h · RM0390 §17.4.7 p. 558 (OC1PE), §17.3.9 p. 531 (PWM mode) · SVD: svd/stm32f446re.svd (TIM2, GPIOA)</footer>
 </main>
 
 <script src="../shared/theme.js"></script>
@@ -343,7 +343,7 @@ var fmt = function (n) { return n.toLocaleString('en-US'); };
     ['Duty resolution', '0.1 % (1 of 1 000)'],
     ['CCR1 at 50 %', '500'],
     ['Pin', 'PA5 · TIM2_CH1'],
-    ['Who owns TIM2', 'lib/pwm.c']
+    ['Who owns TIM2', 'lib/core/pwm.c']
   ].map(function (r) { return '<div><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
   render();
 })();

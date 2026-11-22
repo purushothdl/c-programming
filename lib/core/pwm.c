@@ -3,7 +3,7 @@
 #include "clock.h"
 
 /*
- * TIM2 counts from the APB1 timer clock (lib/clock.h): 16 MHz at reset, 90 MHz
+ * TIM2 counts from the APB1 timer clock (lib/core/clock.h): 16 MHz at reset, 90 MHz
  * after clock_init() (RM0390 6.2: 2x PCLK1 when the APB1 prescaler is above 1).
  * PSC is computed from it at init, so the tick stays 1 us either way.
  *

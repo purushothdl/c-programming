@@ -2,7 +2,7 @@
 #include "pwm.h"
 
 /*
- * Step 6b: the LED fades up from off (lib/pwm.c), then starts again.
+ * Step 6b: the LED fades up from off (lib/core/pwm.c), then starts again.
  *
  * Raises the duty by 25 steps every 50 ms: 0 to 1000 in about 2 s.
  */

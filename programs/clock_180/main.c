@@ -8,12 +8,12 @@
 /*
  * Step 7: run the chip at 180 MHz and prove it.
  *
- * clock_init() (lib/clock.c) builds the clock before anything else starts.
- * uart.c and pwm.c then derive their settings from lib/clock.h, so the same
+ * clock_init() (lib/core/clock.c) builds the clock before anything else starts.
+ * uart.c and pwm.c then derive their settings from lib/core/clock.h, so the same
  * 115200 baud and 1 kHz PWM come out at the new speed. The measurement part is
  * tim_pwm_measure with the tick rate read from the clock instead of assumed:
  *
- *   TIM2 CH1 (lib/pwm.c) --PA5--jumper--PA0--> TIM5 CH1 + CH2 (PWM input mode)
+ *   TIM2 CH1 (lib/core/pwm.c) --PA5--jumper--PA0--> TIM5 CH1 + CH2 (PWM input mode)
  *
  * Wiring: CN10 pin 11 (PA5) -> CN7 pin 28 (PA0).
  *
@@ -170,7 +170,7 @@ static void print_field(const char *name, uint32_t v)
     uart_puts("\r\n");
 }
 
-/* Everything below is decoded from the registers, not from lib/clock.c's
+/* Everything below is decoded from the registers, not from lib/core/clock.c's
    numbers, so it shows what the hardware is really set to. */
 static void cmd_clocks(char *args[])
 {

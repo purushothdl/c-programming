@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /*
- * Tiny command line over the UART (lib/uart.h must be initialised first).
+ * Tiny command line over the UART (lib/core/uart.h must be initialised first).
  *
  * Built in:
  *   help

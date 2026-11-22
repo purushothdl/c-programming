@@ -4,12 +4,12 @@
 #include <stdint.h>
 
 /*
- * NXP MFRC522 (the chip on the RC522 module) over lib/spi.h. Registers and
- * framing come from the MFRC522 datasheet (Components/MFRC522.pdf, docs/mfrc522.md),
+ * NXP MFRC522 (the chip on the RC522 module) over lib/core/spi.h. Registers and
+ * framing come from the MFRC522 datasheet (Components/MFRC522.pdf, docs/components/mfrc522.md),
  * not from the SVD.
  *
  *   RST  PB10  GPIO Arduino D6   -> NRSTPD (low = power-down, rising edge = reset)
- *   CS   PB6   the module's "SDA" pin is the chip select (NSS), from lib/spi.c
+ *   CS   PB6   the module's "SDA" pin is the chip select (NSS), from lib/core/spi.c
  *
  * SPI mode 0, MSB first, 10 Mbit/s maximum (datasheet 8.1.2). Every register
  * access is one address byte then data bytes with CS held low (8.1.2.1-3).
@@ -66,5 +66,40 @@ int rc522_self_test_keep_buffer(uint8_t out[RC522_FIFO_SIZE]);
  */
 int rc522_mem_write(const uint8_t data[RC522_MEM_SIZE]);
 int rc522_mem_read(uint8_t out[RC522_MEM_SIZE]);
+
+/*
+ * Talking to a tag (ISO/IEC 14443A over the RC522's antenna). The MCU is
+ * always the SPI master: a tag's reply arrives by radio into the RC522's FIFO
+ * and is read out over SPI like any register. See visualizations/spi/rc522-uid.html.
+ *
+ * Result codes (negative = no usable reply):
+ */
+#define RC522_OK            0
+#define RC522_NO_TAG        (-1)    /* the timeout timer ran out: nobody answered */
+#define RC522_ERR           (-2)    /* ErrorReg flagged the reply (parity, collision, ...) */
+#define RC522_NO_FLAG       (-3)    /* the chip raised no flag in time (SPI or chip fault) */
+#define RC522_BAD_FRAME     (-4)    /* reply has the wrong length or ends mid-byte */
+#define RC522_BAD_BCC       (-5)    /* the 5th byte does not match the XOR of the UID bytes */
+#define RC522_CASCADE       (-6)    /* UID starts with 0x88: a 7-byte UID, only 3 bytes are in uid[1..3] */
+
+/* Timer (25 ms timeout), 100% ASK, antenna on. Call once after rc522_init(). */
+void rc522_picc_init(void);
+
+/*
+ * One exchange: send tx_len bytes (the last one with tx_last_bits bits, 0 = all
+ * 8), wait for the reply or the timeout, copy up to rx_max bytes to rx.
+ * *rx_len and *rx_last_bits (valid bits in the last byte, 0 = all) are set on
+ * RC522_OK. Needs the antenna on (picc_init).
+ */
+int rc522_transceive(const uint8_t *tx, uint32_t tx_len, uint32_t tx_last_bits,
+                     uint8_t *rx, uint32_t rx_max, uint32_t *rx_len, uint32_t *rx_last_bits);
+
+/* REQA (26h) or, with wake != 0, WUPA (52h): a 7-bit frame. The tag answers
+   with 2 bytes, the ATQA. 00 04h = 4-byte UID, 00 44h = 7-byte UID (MF1S50 p.15). */
+int rc522_request(uint8_t atqa[2], int wake);
+
+/* Anticollision, cascade level 1 (93h 20h): the tag answers with 4 UID bytes
+   and a check byte. RC522_OK when the check byte matches. */
+int rc522_read_uid(uint8_t uid[4]);
 
 #endif

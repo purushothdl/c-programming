@@ -17,7 +17,7 @@
  *   An interval is new - old in unsigned arithmetic, so one wrap in between
  *   still gives the right answer. Gaps above 71.6 min do not.
  *
- * Why TIM5 and not TIM2: lib/pwm.c owns TIM2. TIM5 is the other 32-bit timer,
+ * Why TIM5 and not TIM2: lib/core/pwm.c owns TIM2. TIM5 is the other 32-bit timer,
  * so the next step can run PWM and capture at the same time.
  *
  *   TIM5 ISR  --(g_presses, g_interval_us, g_bounces)-->  main prints

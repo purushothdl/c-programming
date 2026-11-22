@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RC522 tag read, interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+[hidden] { display: none !important; }
+.seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+.seg2 button { font: 400 12px "Inter", sans-serif; padding: 6px 12px; border: 0; background: var(--card); color: var(--ink-2); cursor: pointer; }
+.seg2 button[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); }
+.ctl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ctl .n { margin-left: auto; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+
+/* the arena: MCU | SPI | RC522 | radio | tag */
+.arena { display: grid; grid-template-columns: minmax(0, .8fr) 74px minmax(0, 2.2fr) 74px minmax(0, .9fr); gap: 0; align-items: stretch; }
+.box { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 10px 12px; min-width: 0; transition: border-color .2s; }
+.box.on { border-color: var(--ember); }
+.box h3 { margin: 0 0 2px; font: 500 13px "Inter", sans-serif; color: var(--ink); display: flex; justify-content: space-between; gap: 6px; }
+.box h3 span { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.box p { margin: 0; font-size: 12px; color: var(--ink-2); }
+.say { margin-top: 8px; font: 500 12px "JetBrains Mono", monospace; color: var(--ink); min-height: 34px; }
+.say small { display: block; color: var(--ink-3); font-weight: 400; font-size: 11px; }
+.link { display: grid; place-items: center; text-align: center; font: 400 10px "JetBrains Mono", monospace; color: var(--ink-3); position: relative; }
+.link::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed var(--line); }
+.link .arr { position: relative; background: var(--bg); padding: 2px 4px; font-size: 20px; line-height: 1; color: var(--ink-3); }
+.link .lab { position: relative; background: var(--bg); padding: 0 4px; margin-top: 4px; }
+.link.on::before { border-top: 2px solid var(--ember); }
+.link.on .arr, .link.on .lab { color: var(--ember); }
+.inner { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.tile { border: 1px solid var(--line-2); border-radius: 4px; background: var(--card-2); padding: 8px 10px; min-width: 0; }
+.tile b { display: block; font: 500 10px "Inter", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.tile .v { font: 500 13px "JetBrains Mono", monospace; color: var(--ink); min-height: 18px; }
+.tile .v small { display: block; font: 400 10.5px "Inter", sans-serif; color: var(--ink-3); }
+.tile.hit { animation: hit .8s ease-out; }
+@keyframes hit { from { box-shadow: 0 0 0 2px var(--ember); } to { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .tile.hit { animation: none; } }
+.fifo { display: flex; flex-wrap: wrap; gap: 3px; min-height: 24px; }
+.fifo i { font: 500 11px "JetBrains Mono", monospace; font-style: normal; border: 1px solid var(--ember); background: color-mix(in srgb, var(--ember) 12%, var(--card)); border-radius: 2px; padding: 3px 5px; color: var(--ink); }
+.fifo em { font-style: normal; color: var(--ink-3); font-size: 12px; align-self: center; }
+.lamps { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.lamp { display: flex; align-items: center; gap: 6px; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.lamp i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); flex: none; }
+.lamp.on { color: var(--ink); }
+.lamp.on i { background: var(--ember); border-color: var(--ember); }
+.lamp.bad.on i { background: var(--bad); border-color: var(--bad); }
+.lamp.stale.on i { background: var(--warn); border-color: var(--warn); }
+.cap { margin-top: 12px; border: 1px solid var(--line); border-left: 2px solid var(--ember); border-radius: 4px; background: var(--card); padding: 12px 14px; display: grid; gap: 8px; }
+.cap h3 { margin: 0; font: 500 15px "Inter", sans-serif; color: var(--ink); }
+.cap p { margin: 0; font-size: 13.5px; color: var(--ink); max-width: 60em; }
+.wrote { display: flex; flex-wrap: wrap; gap: 6px; }
+.strip { display: flex; gap: 3px; margin: 12px 0 0; flex-wrap: wrap; }
+.strip button { font: 400 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--ink-3); padding: 4px 8px; cursor: pointer; }
+.strip button.done { color: var(--ink-2); }
+.strip button.cur { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.strip .gap { width: 10px; }
+
+.sheet { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.sheet .card b { display: flex; justify-content: space-between; gap: 6px; color: var(--ink); font-weight: 500; font-size: 13px; margin-bottom: 4px; }
+.sheet .card b span { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.sheet .card .w { margin-top: 8px; font: 500 12px "JetBrains Mono", monospace; color: var(--ink); }
+.sheet .card .w small { display: block; font: 400 11px "Inter", sans-serif; color: var(--ink-3); }
+
+.xor { display: grid; gap: 8px; }
+.xr { display: grid; grid-template-columns: 70px repeat(8, minmax(0, 1fr)) 40px; gap: 3px; align-items: center; font: 400 12px "JetBrains Mono", monospace; }
+.xr .lab { color: var(--ink-3); font-size: 11px; }
+.xr button { font: 500 13px "JetBrains Mono", monospace; border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--ink-3); padding: 5px 0; cursor: pointer; }
+.xr button.one { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.xr button.flip { outline: 2px solid var(--bad); }
+.xr .hx { text-align: right; color: var(--ink); }
+.xr .cnt { text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 3px; padding: 4px 0; }
+.xr .res { text-align: center; border: 1px solid var(--line); border-radius: 3px; padding: 5px 0; background: var(--card-2); color: var(--ink); font-weight: 500; }
+.xr .res.odd { background: var(--btn); color: var(--btn-ink); }
+.verdict { padding: 8px 12px; border-radius: 4px; font-size: 13px; border: 1px solid var(--line); }
+.verdict.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.verdict.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+@media (max-width: 900px) {
+  .arena { grid-template-columns: 1fr; }
+  .link { height: 44px; } .link::before { left: 50%; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 2px dashed var(--line); }
+  .link.on::before { border-left: 2px solid var(--ember); border-top: 0; }
+  .sheet { grid-template-columns: 1fr 1fr; }
+  .xr { grid-template-columns: 50px repeat(8, minmax(0, 1fr)) 32px; }
+}
+@media (max-width: 560px) { .sheet { grid-template-columns: 1fr; } }
+</style>
+<script src="../shared/themes.js"></script>
+</head>
+<body>
+<nav><div class="wrap"><a class="brand" href="../index.html">RC522 tag read <span>spi/</span></a><a class="l" href="#walk">one tap</a><a class="l" href="#sheet">registers</a><a class="l" href="#xor">XOR check</a><button class="tg" id="theme"></button></div></nav>
+<main class="wrap">
+
+<section id="walk">
+  <div class="sh"><div class="eyebrow">01 · one tap</div>
+  <h1 style="font-size:36px">Who talks to <em>whom</em> when you tap a tag</h1>
+  <p>The MCU only ever talks to the RC522, over SPI. The RC522 talks to the tag by radio. Press Next and watch what lights up.</p></div>
+
+  <div class="ctl" style="margin-bottom:10px"><div class="seg2" id="scn">
+    <button aria-pressed="true" data-s="present">tag present</button>
+    <button aria-pressed="false" data-s="none">no tag in range</button>
+    <button aria-pressed="false" data-s="parity">what goes wrong: damaged reply</button></div></div>
+
+  <div class="arena">
+    <div class="box" id="bm"><h3>MCU <span>SPI master</span></h3><p>Our code. Starts everything, reads the results.</p><div class="say" id="mnote"></div></div>
+    <div class="link" id="lspi"><div class="arr" id="aspi">⇄</div><div class="lab">SPI wires</div></div>
+    <div class="box" id="br"><h3>RC522 <span>SPI slave</span></h3>
+      <div class="inner">
+        <div class="tile" id="tt"><b>Timeout timer</b><div class="v" id="vt"></div></div>
+        <div class="tile" id="ta"><b>Antenna</b><div class="v" id="va"></div></div>
+        <div class="tile" id="tf"><b>FIFO (waiting line)</b><div class="fifo" id="vf"></div></div>
+        <div class="tile" id="tg"><b>Flags (what happened)</b><div class="lamps" id="vg"></div></div>
+      </div>
+      <div class="say" id="rnote"></div></div>
+    <div class="link" id="lrad"><div class="arr" id="arad">⇄</div><div class="lab">radio</div></div>
+    <div class="box" id="bt"><h3>Tag <span>no battery</span></h3><p>Wakes from the reader's field. Only answers when asked.</p><div class="say" id="tnote"></div></div>
+  </div>
+
+  <div class="cap"><h3 id="ct"></h3><p id="cd"></p><div class="wrote" id="cw"></div>
+    <div class="ctl"><button class="btn ghost sm" id="bp">← Back</button><button class="btn dark sm" id="bn">Next →</button><button class="btn sm" id="brs">Reset</button><span class="n" id="bc"></span></div></div>
+  <div class="strip" id="strip"></div>
+  <p class="note" style="margin-top:10px">The UID <code>04 A3 5C 1F</code> is made up for the picture. The model shows the order of events and the main flags. It leaves out the radio coding, the parity bits and exact timing.</p>
+</section>
+
+<section id="sheet">
+  <div class="sh"><div class="eyebrow">02 · the registers, in one line each</div>
+  <h2>What each one is for</h2>
+  <p>Only what matters. Page numbers are in the MFRC522 datasheet.</p></div>
+  <div class="sheet" id="sheetgrid"></div>
+</section>
+
+<section id="gotchas">
+  <div class="sh"><div class="eyebrow">03 · three traps the datasheet sets</div><h2>Why the order matters</h2></div>
+  <div class="three">
+    <div class="card"><b>The flags start dirty</b>At reset the flag register already reads <code>0x14</code>: two flags are on. Clear them before each exchange, or an old flag looks like a new event (p.39).</div>
+    <div class="card"><b>The receiver starts off</b>CommandReg is <code>0x20</code> at reset and bit 5 means "receiver off". Writing a plain <code>0x0C</code> (Transceive) clears it. Writing <code>0x2C</code> would leave it off (p.38).</div>
+    <div class="card"><b>Transceive never stops itself</b>After the reply, or after a timeout, we must write Idle (<code>0x00</code>). The antenna must also be on first, or nothing is sent (p.48, p.72).</div>
+  </div>
+</section>
+
+<section id="xor">
+  <div class="sh"><div class="eyebrow">04 · the check byte</div>
+  <h2>What a 4-input XOR means</h2>
+  <p>For each bit column, count the ones. An odd count gives 1, an even count gives 0. Click a bit in the received UID to damage it.</p></div>
+  <div class="xor" id="xor"></div>
+</section>
+
+<footer>Sources: MFRC522 datasheet Rev. 3.9: interrupts p.30-31, timer p.31-32, CommandReg p.38, ComIrqReg p.39-40, ErrorReg p.41, FIFO p.44, BitFramingReg p.46, ModeReg p.48, TxControlReg p.50, timer registers p.60-62, Transceive p.72. MF1S50 datasheet Rev. 3.2: REQA 26h (7 bit) and anticollision 93h 20h p.13, ATQA p.15, parity per byte p.7. Not in either document: the check byte (BCC) and the meaning of 20h in 93h 20h; they come from ISO/IEC 14443-3 and are unverified here. Nothing on this page was measured on a tag.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+(function () {
+  function hx(v) { return ('00' + v.toString(16).toUpperCase()).slice(-2); }
+  function xor(a) { return a.reduce(function (x, y) { return x ^ y; }, 0); }
+
+  /* ================= model: only what the picture shows ================= */
+  var TAG = { atqa: [0x04, 0x00], uid: [0x04, 0xA3, 0x5C, 0x1F] };
+  function fresh() {
+    return { timer: 'unset', antenna: false, fifo: [], cmd: 'Idle', flags: { stale: true, tx: false, rx: false, tmr: false, err: false }, mcu: '', rc: '', tag: '', spi: null, rad: null };
+  }
+
+  /* a step: title, text, what travels on SPI (chips), arrow directions, state change */
+  function S(t, d, o) { o.t = t; o.d = d; return o; }
+
+  function loop(first, tx, last, reply, outcome) {
+    var s = [];
+    var hk = first ? 'Clear the flags (ComIrqReg ← 0x7F) and empty the FIFO (FIFOLevelReg ← 0x80)' : 'Same housekeeping again: clear the flags, empty the FIFO';
+    s.push(S('Housekeeping', 'Wipe the flags so only new events show up, and empty the FIFO so only our request is in it.', {
+      spi: '→', chips: ['ComIrqReg ← 0x7F', 'FIFOLevelReg ← 0x80'], mcu: 'clears flags, empties FIFO', ap: function (m) { m.flags = { stale: false, tx: false, rx: false, tmr: false, err: false }; m.fifo = []; m.rc = 'flags cleared'; } }));
+    s.push(S('Load the request', 'The request goes into the FIFO first. A command takes its data from there.', {
+      spi: '→', chips: ['FIFODataReg ← ' + tx.map(hx).join(' ')], mcu: 'writes ' + tx.map(hx).join(' '), ap: function (m) { m.fifo = tx.slice(); m.rc = 'request waiting'; } }));
+    s.push(S('Press go', (last ? 'REQA is a 7-bit frame, so we tell it to send only 7 bits of the last byte (BitFramingReg ← 0x07). ' : 'These are whole bytes, so all 8 bits are sent (BitFramingReg ← 0x00). ') + 'Then start Transceive (CommandReg ← 0x0C) and set StartSend (BitFramingReg bit 7).', {
+      spi: '→', chips: ['BitFramingReg ← ' + (last ? '0x07' : '0x00'), 'CommandReg ← 0x0C', 'BitFramingReg ← ' + (last ? '0x87' : '0x80')], mcu: 'Transceive + StartSend', ap: function (m) { m.cmd = 'Transceive'; m.rc = 'sending next'; } }));
+    s.push(S('The request goes out by radio', 'The RC522 sends the bytes over the field. The TxIRq flag lights when the last bit has left. The timeout timer starts counting by itself.', {
+      rad: '→', chips: [], rc: '', tag: 'hears the request', ap: function (m) { m.fifo = []; m.flags.tx = true; m.timer = 'running'; m.rc = 'sent'; m.tag = 'hears: ' + tx.map(hx).join(' '); } }));
+    if (outcome === 'timeout') {
+      s.push(S('Nobody answers', 'No tag in the field, so the timer counts down to zero and lights TimerIRq. This is the normal "no card" result, not an error.', {
+        rad: null, chips: [], ap: function (m) { m.timer = 'zero'; m.flags.tmr = true; m.rc = 'timer ran out'; m.tag = '(not there)'; } }));
+      s.push(S('MCU sees the timeout', 'The MCU keeps reading the flag register. TimerIRq means no reply. It stops the command (CommandReg ← 0x00), reports nothing, and tries again in about 100 ms.', {
+        spi: '⇄', chips: ['ComIrqReg → TimerIRq', 'CommandReg ← 0x00'], mcu: 'no card, wait 100 ms', ap: function (m) { m.cmd = 'Idle'; m.mcu = 'no card; poll again in ~100 ms'; } }));
+      return s;
+    }
+    s.push(S(outcome === 'rxerr' ? 'The reply arrives damaged' : 'The tag answers', outcome === 'rxerr'
+      ? 'The bytes arrive, but a byte\'s parity bit is wrong. RxIRq lights, and so does the error flag (ErrorReg shows ParityErr).'
+      : 'The tag replies by loading the field. The receiver puts the bytes in the FIFO and lights RxIRq. The timer stops.', {
+      rad: '←', chips: [], tag: 'sends ' + reply.map(hx).join(' '), ap: function (m) { m.fifo = reply.slice(); m.flags.rx = true; if (outcome === 'rxerr') m.flags.err = true; m.timer = 'stopped'; m.rc = 'reply stored'; } }));
+    s.push(S('MCU notices and reads', outcome === 'rxerr'
+      ? 'The MCU sees the error flag, so it throws the reply away without using it.'
+      : 'The MCU reads the flags (RxIRq: a reply came) and ErrorReg (clean). It writes Idle to stop Transceive, then reads the bytes out of the FIFO.', {
+      spi: '⇄', chips: outcome === 'rxerr' ? ['ComIrqReg → RxIRq + ErrIRq', 'ErrorReg → ParityErr', 'CommandReg ← 0x00'] : ['ComIrqReg → RxIRq', 'ErrorReg → 0x00', 'CommandReg ← 0x00', 'FIFODataReg → ' + reply.map(hx).join(' ')],
+      mcu: outcome === 'rxerr' ? 'discards the reply' : 'got ' + reply.map(hx).join(' '), ap: function (m) { m.cmd = 'Idle'; m.fifo = []; m.mcu = outcome === 'rxerr' ? 'bad reply, thrown away' : 'got ' + reply.map(hx).join(' '); } }));
+    return s;
+  }
+
+  function build(kind) {
+    var s = [];
+    s.push(S('Set the timeout clock', 'Three settings make a stopwatch: 25 µs per tick, 1000 ticks, which is 25 ms. It starts by itself when a send ends (TAuto). If it reaches zero, nobody answered.', {
+      spi: '→', chips: ['TModeReg ← 0x80', 'TPrescalerReg ← 0xA9', 'TReloadReg ← 0x03E8'], mcu: 'sets the timer', ap: function (m) { m.timer = 'ready'; m.rc = 'stopwatch set'; } }));
+    s.push(S('Switch the antenna on', 'At reset the antenna is off, so no tag gets power. Set the two driver bits (TxControlReg ← 0x83, plus TxASKReg ← 0x40). Now the 13.56 MHz field is on and the tag wakes up.', {
+      spi: '→', chips: ['TxASKReg ← 0x40', 'TxControlReg ← 0x83'], mcu: 'antenna on', ap: function (m) { m.antenna = true; m.rc = 'field on'; m.tag = kind === 'none' ? '(none here)' : 'powered by the field'; } }));
+    if (kind === 'none') { s = s.concat(loop(true, [0x26], 7, null, 'timeout')); return s; }
+    s = s.concat(loop(true, [0x26], 7, TAG.atqa, 'rx'));
+    s.push(S('Read the answer', 'The tag said 04 00. In the tag manual (Table 11, p.15) that value means a 4-byte UID. A 7-byte tag would answer 44 00 and need a second round.', {
+      chips: [], mcu: 'ATQA 04 00: 4-byte UID', ap: function (m) { m.mcu = 'ATQA 04 00: 4-byte UID'; } }));
+    var uidReply = TAG.uid.concat([xor(TAG.uid)]);
+    if (kind === 'parity') {
+      s = s.concat(loop(false, [0x93, 0x20], 0, uidReply, 'rxerr'));
+      s.push(S('Reject and try again', 'The parity error means the bytes can not be trusted. The program drops them and polls again later.', { chips: [], mcu: 'discard, poll again', ap: function (m) { m.mcu = 'discard, poll again'; } }));
+      return s;
+    }
+    s = s.concat(loop(false, [0x93, 0x20], 0, uidReply, 'rx'));
+    s.push(S('Check byte, then the UID', 'Five bytes: 04 A3 5C 1F and E4. The XOR of the first four is E4, which matches the fifth. The read is intact, so print the UID. (The check byte comes from ISO 14443-3, not from our two datasheets.)', {
+      chips: [], mcu: 'UID 04 A3 5C 1F ✓', ap: function (m) { m.mcu = 'UID 04 A3 5C 1F  (04^A3^5C^1F = E4 ✓)'; } }));
+    return s;
+  }
+
+  /* ================= walk-through ================= */
+  var scn = 'present', steps, snaps, si;
+  function recompute() {
+    steps = build(scn); snaps = []; var m = fresh();
+    steps.forEach(function (s) {
+      var pre = JSON.parse(JSON.stringify(m));
+      m.spi = s.spi || null; m.rad = s.rad || null; m.mcu = s.mcu || 'waiting…'; m.tag = '';
+      s.ap(m); if (!m.tag && s.tag) m.tag = s.tag;
+      snaps.push({ m: JSON.parse(JSON.stringify(m)), pre: pre });
+    });
+  }
+  var TIMER = { unset: 'not set up', ready: 'ready: 25 ms', running: 'RUNNING', stopped: 'stopped (reply came)', zero: 'reached 0' };
+  var TIMERS = { unset: 'reset value 0', ready: '25 µs × 1000', running: 'counting down', stopped: 'stopped by the reply', zero: 'TimerIRq set' };
+  function lamp(on, name, cls) { return '<div class="lamp ' + (cls || '') + (on ? ' on' : '') + '"><i></i>' + name + '</div>'; }
+  function draw() {
+    var m = snaps[si].m, pre = snaps[si].pre, s = steps[si];
+    document.getElementById('mnote').innerHTML = m.mcu ? m.mcu : '';
+    document.getElementById('rnote').innerHTML = (m.cmd === 'Transceive' ? 'command: <b>Transceive</b>' : 'command: Idle') + (m.rc ? ' · ' + m.rc : '');
+    document.getElementById('tnote').innerHTML = m.tag || (m.antenna ? '' : 'no power yet');
+    document.getElementById('vt').innerHTML = TIMER[m.timer] + '<small>' + TIMERS[m.timer] + '</small>';
+    document.getElementById('va').innerHTML = m.antenna ? 'ON<small>13.56 MHz field</small>' : 'OFF<small>no field, tag asleep</small>';
+    document.getElementById('vf').innerHTML = m.fifo.length ? m.fifo.map(function (b) { return '<i>' + hx(b) + '</i>'; }).join('') : '<em>empty</em>';
+    document.getElementById('vg').innerHTML = lamp(m.flags.stale, 'old flags', 'stale') + lamp(m.flags.tx, 'TxIRq: sent') + lamp(m.flags.rx, 'RxIRq: reply') + lamp(m.flags.tmr, 'TimerIRq: none') + lamp(m.flags.err, 'error', 'bad');
+    var changed = { tt: m.timer !== pre.timer, ta: m.antenna !== pre.antenna, tf: m.fifo.join() !== pre.fifo.join(), tg: JSON.stringify(m.flags) !== JSON.stringify(pre.flags) };
+    ['tt', 'ta', 'tf', 'tg'].forEach(function (id) { var e = document.getElementById(id); e.classList.remove('hit'); if (changed[id]) { void e.offsetWidth; e.classList.add('hit'); } });
+    var spiOn = !!s.spi, radOn = !!s.rad;
+    document.getElementById('lspi').classList.toggle('on', spiOn); document.getElementById('lrad').classList.toggle('on', radOn);
+    document.getElementById('aspi').textContent = s.spi || '⇄'; document.getElementById('arad').textContent = s.rad || '⇄';
+    document.getElementById('bm').classList.toggle('on', spiOn);
+    document.getElementById('br').classList.toggle('on', spiOn || radOn || m.timer !== pre.timer);
+    document.getElementById('bt').classList.toggle('on', radOn);
+    document.getElementById('ct').textContent = (si + 1) + ' · ' + s.t;
+    document.getElementById('cd').textContent = s.d;
+    document.getElementById('cw').innerHTML = (s.chips || []).map(function (c) { return '<span class="chip">' + c + '</span>'; }).join('') || '<span class="note">no SPI traffic in this step</span>';
+    document.getElementById('bc').textContent = (si + 1) + ' / ' + steps.length;
+    document.getElementById('bp').disabled = si === 0; document.getElementById('bn').disabled = si === steps.length - 1;
+    var st = ''; steps.forEach(function (x, i) { st += '<button data-i="' + i + '" class="' + (i === si ? 'cur' : i < si ? 'done' : '') + '" title="' + x.t.replace(/"/g, '') + '">' + (i + 1) + '</button>'; });
+    document.getElementById('strip').innerHTML = st;
+    [].forEach.call(document.querySelectorAll('#strip button'), function (b) { b.onclick = function () { go(+b.dataset.i); }; });
+  }
+  function go(i) { si = Math.max(0, Math.min(steps.length - 1, i)); draw(); }
+  document.getElementById('bn').onclick = function () { go(si + 1); };
+  document.getElementById('bp').onclick = function () { go(si - 1); };
+  document.getElementById('brs').onclick = function () { go(0); };
+  document.getElementById('scn').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return; scn = b.dataset.s;
+    [].forEach.call(this.children, function (c) { c.setAttribute('aria-pressed', c === b ? 'true' : 'false'); });
+    recompute(); go(0);
+  });
+
+  /* ================= register cheat sheet: one line each ================= */
+  var SHEET = [
+    ['Timer registers', '0x2A 0x2B 0x2C 0x2D · p.60-62', 'A stopwatch for "nobody answered". 25 µs per tick × 1000 ticks = 25 ms.', 'TMode 0x80, TPrescaler 0xA9, TReload 0x03E8', 'timer starts by itself after a send'],
+    ['TxControlReg', '0x14 · p.50', 'The antenna switch. Off at reset, so tags get no power.', '0x83', 'both driver bits on'],
+    ['TxASKReg', '0x15 · p.51', 'Modulation depth of the request. We force 100%, as standard drivers do.', '0x40', 'a habit, not a datasheet requirement'],
+    ['CommandReg', '0x01 · p.38, p.70-72', 'What the chip is doing. Transceive = send, then listen. Idle = stop.', '0x0C to start, 0x00 to stop', 'plain 0x0C also turns the receiver on'],
+    ['FIFODataReg + FIFOLevelReg', '0x09 0x0A · p.44', 'The waiting line: request in, reply out. Write 0x80 to FIFOLevelReg to empty it.', 'flush 0x80, then data', 'level says how many reply bytes arrived'],
+    ['BitFramingReg', '0x0D · p.46', 'How many bits of the last byte to send, and the go button (StartSend).', '0x07 + go for REQA, 0x00 + go otherwise', 'REQA is the one 7-bit frame'],
+    ['ComIrqReg', '0x04 · p.39-40', 'The flags. We use four: TxIRq (sent), RxIRq (reply ended), TimerIRq (nobody answered), ErrIRq (something wrong).', 'write 0x7F to clear all', 'reads 0x14 at reset: clear before use'],
+    ['ErrorReg', '0x06 · p.41', 'Says what went wrong. The one that matters: ParityErr, a damaged byte. Any set bit means discard the reply.', 'read only', 'cleared by the next command']
+  ];
+  document.getElementById('sheetgrid').innerHTML = SHEET.map(function (r) {
+    return '<div class="card"><b>' + r[0] + '<span>' + r[1] + '</span></b>' + r[2] + '<div class="w">' + r[3] + '<small>' + r[4] + '</small></div></div>';
+  }).join('');
+
+  /* ================= XOR widget ================= */
+  var X0 = [0x04, 0xA3, 0x5C, 0x1F], bccSent = xor(X0), recv = X0.slice();
+  function bitCount(v) { var n = 0; while (v) { n += v & 1; v >>= 1; } return n; }
+  function drawXor() {
+    var h = '<div class="xr"><span class="lab"></span>';
+    for (var b = 7; b >= 0; b--) h += '<span class="lab" style="text-align:center">' + b + '</span>';
+    h += '<span class="lab" style="text-align:right">hex</span></div>';
+    recv.forEach(function (v, i) {
+      h += '<div class="xr"><span class="lab">UID' + i + '</span>';
+      for (var b = 7; b >= 0; b--) {
+        var bit = (v >> b) & 1, flipped = bit !== ((X0[i] >> b) & 1);
+        h += '<button class="' + (bit ? 'one ' : '') + (flipped ? 'flip' : '') + '" data-i="' + i + '" data-b="' + b + '">' + bit + '</button>';
+      }
+      h += '<span class="hx">' + hx(v) + '</span></div>';
+    });
+    h += '<div class="xr"><span class="lab">ones</span>';
+    for (var c = 7; c >= 0; c--) { var n = recv.reduce(function (s, v) { return s + ((v >> c) & 1); }, 0); h += '<span class="cnt">' + n + '</span>'; }
+    h += '<span></span></div>';
+    var x = xor(recv);
+    h += '<div class="xr"><span class="lab">XOR of 4</span>';
+    for (var d = 7; d >= 0; d--) h += '<span class="res ' + ((x >> d) & 1 ? 'odd' : '') + '">' + ((x >> d) & 1) + '</span>';
+    h += '<span class="hx">' + hx(x) + '</span></div>';
+    h += '<div class="xr"><span class="lab">sent BCC</span>';
+    for (var e = 7; e >= 0; e--) h += '<span class="res ' + ((bccSent >> e) & 1 ? 'odd' : '') + '">' + ((bccSent >> e) & 1) + '</span>';
+    h += '<span class="hx">' + hx(bccSent) + '</span></div>';
+    var ok = x === bccSent, flips = recv.reduce(function (s, v, i) { return s + bitCount(v ^ X0[i]); }, 0);
+    h += '<div class="verdict ' + (ok ? 'ok' : 'bad') + '">' + (ok ? (flips === 0 ? 'Intact: the XOR of the 4 received bytes equals the check byte.' : 'Damaged but NOT detected: the flips cancelled in every column. This is the weakness of an XOR check.') : 'Mismatch: the check byte caught the damage (' + flips + ' bit' + (flips === 1 ? '' : 's') + ' flipped).') + '</div>';
+    h += '<div class="ctl"><button class="btn ghost sm" id="xr">Undo all flips</button><span class="note">Not a security check: anyone can compute it, and a clone has a correct one. It only detects transmission damage. Try flipping the same column in two different bytes.</span></div>';
+    document.getElementById('xor').innerHTML = h;
+    [].forEach.call(document.querySelectorAll('#xor .xr button'), function (b) { b.onclick = function () { recv[+b.dataset.i] ^= (1 << +b.dataset.b); drawXor(); }; });
+    document.getElementById('xr').onclick = function () { recv = X0.slice(); drawXor(); };
+  }
+  drawXor();
+
+  recompute(); go(0);
+  window.UID = { steps: function () { return steps; }, snaps: function () { return snaps; }, go: go, setScn: function (s) { scn = s; recompute(); go(0); }, xor: xor, cur: function () { return si; } };
+})();
+</script>
+</body>
+</html>

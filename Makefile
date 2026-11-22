@@ -3,9 +3,11 @@
 # programs/  -> firmware you flash to the board (needs startup.s + linker.ld)
 #               programs/<name>.c         single-file program
 #               programs/<name>/main.c    multi-file program: every .c in that
-#                                         folder plus every .c in lib/
-# lib/       -> shared modules for the multi-file programs (unused code is
-#               dropped by --gc-sections)
+#                                         folder plus every .c in lib/core and lib/devices
+# lib/core/    -> peripheral drivers and helpers (uart, spi, clock, delay, ...)
+# lib/devices/ -> drivers for off-board parts (rc522, mpu6500, ...)
+#               both are shared by the multi-file programs; unused code is
+#               dropped by --gc-sections
 # examples/  -> C sources compiled only to assembly for study (never flashed)
 
 BUILD := build
@@ -19,7 +21,7 @@ OBJDUMP := arm-none-eabi-objdump
 CPUFLAGS := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
 CMSIS_DIR := cmsis
 CFLAGS := $(CPUFLAGS) -ffreestanding -fno-builtin -ffunction-sections -fdata-sections \
-           -Wall -Wextra -g -O0 -DSTM32F446xx -I$(CMSIS_DIR) -Ilib
+           -Wall -Wextra -g -O0 -DSTM32F446xx -I$(CMSIS_DIR) -Ilib/core -Ilib/devices
 ASMFLAGS := $(CPUFLAGS) -ffreestanding -fno-builtin -Wall -Wextra
 OPTS := 0 1 2
 LDFLAGS := $(CPUFLAGS) -T linker.ld -nostdlib -Wl,--gc-sections
@@ -38,7 +40,7 @@ programs: $(PROGRAMS)
 # Build one board program: make program P=blink
 program:
 	@mkdir -p $(BUILD)/$(P)
-	@if [ -f programs/$(P)/main.c ]; then srcs="$(wildcard programs/$(P)/*.c) $(wildcard lib/*.c)"; \
+	@if [ -f programs/$(P)/main.c ]; then srcs="$(wildcard programs/$(P)/*.c) $(wildcard lib/core/*.c) $(wildcard lib/devices/*.c)"; \
 	else srcs="programs/$(P).c"; fi; \
 	objs=""; \
 	for f in $$srcs; do \

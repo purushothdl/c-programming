@@ -139,7 +139,7 @@
     <div><b>Overcapture</b>A second edge before the read overwrites the stamp. CC1OF flags it. Clear by writing 0.</div>
     <div><b>16 µs filter is not debounce</b>Bounce lasts ms. The ISR still checks the quiet time.</div>
     <div><b>Read the pin inside the ISR</b>The edge was µs ago, so IDR still shows which way it went.</div>
-    <div><b>Why TIM5</b>lib/pwm.c owns TIM2. TIM5 is the other 32-bit timer.</div>
+    <div><b>Why TIM5</b>lib/core/pwm.c owns TIM2. TIM5 is the other 32-bit timer.</div>
     <div><b>71.6 min limit</b>One counter wrap between presses is fine. Two are not.</div>
   </div>
 </section>

@@ -7,9 +7,9 @@
 /*
  * Step 5d: interrupt-driven UART with a tiny command line.
  *
- *   lib/ring.c, lib/fmt.c   pure logic: ring buffer, printing and parsing
- *   lib/uart.c              USART2 driver: RX and TX rings, the ISR
- *   lib/cli.c               line editor, tokenizer, help/peek/poke
+ *   lib/core/ring.c, lib/core/fmt.c   pure logic: ring buffer, printing and parsing
+ *   lib/core/uart.c              USART2 driver: RX and TX rings, the ISR
+ *   lib/core/cli.c               line editor, tokenizer, help/peek/poke
  *   board.c                 LED and the 1 ms SysTick tick
  *   fault.c                 HardFault report over polled UART
  *   main.c                  init, program commands, then sleep until a byte arrives

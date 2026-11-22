@@ -48,9 +48,9 @@
   <div class="list">
     <a class="item" href="uart/poll-vs-irq.html"><b>Why we need the ring</b><p>One millisecond of sleep lets eleven bytes pile up behind one register. Step through the loss, then drag the look interval until the same code stops losing data.</p><span class="src">programs/uart_echo_poll.c · RM0390 §25.4.3</span><span class="st new">new style</span></a>
     <a class="item" href="uart/ring-buffer.html"><b>Ring buffer</b><p>Type letters and watch the interrupt fill the ring. Switch between a realistic and a busy main. Drag a slider to see why head &amp; 7 finds the slot.</p><span class="src">programs/uart_echo_irq.c</span><span class="st new">new style</span></a>
-    <a class="item" href="uart/cli-tx.html"><b>TX interrupt</b><p>Send "hi" and watch TXEIE arm and disarm. Four tabs, two of them bugs. A calculator shows when main has to wait.</p><span class="src">lib/uart.c</span><span class="st new">new style</span></a>
-    <a class="item" href="uart/cli-numbers.html"><b>Print and parse</b><p>Type your own input and step through print_dec32, print_hex32, parse_u32 and tokenize line by line.</p><span class="src">lib/fmt.c</span><span class="st new">new style</span></a>
-    <a class="item" href="uart/clock-drift.html"><b>Clock error</b><p>Which baud rates fit the error budget at 16 MHz. Drag the clock error and see where the samples land in a frame.</p><span class="src">lib/uart.c · RM0390 §25.4</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/cli-tx.html"><b>TX interrupt</b><p>Send "hi" and watch TXEIE arm and disarm. Four tabs, two of them bugs. A calculator shows when main has to wait.</p><span class="src">lib/core/uart.c</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/cli-numbers.html"><b>Print and parse</b><p>Type your own input and step through print_dec32, print_hex32, parse_u32 and tokenize line by line.</p><span class="src">lib/core/fmt.c</span><span class="st new">new style</span></a>
+    <a class="item" href="uart/clock-drift.html"><b>Clock error</b><p>Which baud rates fit the error budget at 16 MHz. Drag the clock error and see where the samples land in a frame.</p><span class="src">lib/core/uart.c · RM0390 §25.4</span><span class="st new">new style</span></a>
     <a class="item" href="uart/frame-ticks.html"><b>Receiver, tick by tick</b><p>16 ticks per bit and a 3-sample vote. Add a flipped bit or a short glitch, or a low pulse on an idle line, and see which flag it sets (NF, FE, PE).</p><span class="src">RM0390 §25.4.3 · concept</span><span class="st new">new style</span></a>
   </div>
 </section>
@@ -73,9 +73,9 @@
   <h2>Timers <span>tim/</span></h2>
   <div class="list">
     <a class="item" href="tim/capture.html"><b>TIM5 input capture</b><p>Five event sequences (two of them bugs), a debounce tuning lab, and a register builder for CCMR1 and CCER.</p><span class="src">programs/tim_capture/main.c</span><span class="st new">new style</span></a>
-    <a class="item" href="tim/channels.html"><b>Timer channel path</b><p>Follow one channel from counter to pin through its four gates. Cut one, flip one, and see all four pins on one analyser. Build CCMR1 and CCER and work out period and duty.</p><span class="src">programs/tim_pwm · lib/pwm.c</span><span class="st new">new style</span></a>
-    <a class="item" href="tim/pwm-fade.html"><b>LED fade</b><p>+25 duty every 50 ms: 41 steps, 2.05 s up, then a jump to zero. Linear duty is not linear light, and the 50 ms wait is what makes the fade visible at all.</p><span class="src">programs/tim_pwm_fade · lib/pwm.c</span><span class="st new">new style</span></a>
-    <a class="item" href="tim/pwm-measure.html"><b>PWM measure</b><p>TIM5 watches the PWM through a jumper. Each edge stores a period and a high time with no CPU work. Read the terminal output, the 268 s counter wrap, and why the filter is off.</p><span class="src">programs/tim_pwm_measure · lib/pwm.c</span><span class="st new">new style</span></a>
+    <a class="item" href="tim/channels.html"><b>Timer channel path</b><p>Follow one channel from counter to pin through its four gates. Cut one, flip one, and see all four pins on one analyser. Build CCMR1 and CCER and work out period and duty.</p><span class="src">programs/tim_pwm · lib/core/pwm.c</span><span class="st new">new style</span></a>
+    <a class="item" href="tim/pwm-fade.html"><b>LED fade</b><p>+25 duty every 50 ms: 41 steps, 2.05 s up, then a jump to zero. Linear duty is not linear light, and the 50 ms wait is what makes the fade visible at all.</p><span class="src">programs/tim_pwm_fade · lib/core/pwm.c</span><span class="st new">new style</span></a>
+    <a class="item" href="tim/pwm-measure.html"><b>PWM measure</b><p>TIM5 watches the PWM through a jumper. Each edge stores a period and a high time with no CPU work. Read the terminal output, the 268 s counter wrap, and why the filter is off.</p><span class="src">programs/tim_pwm_measure · lib/core/pwm.c</span><span class="st new">new style</span></a>
   </div>
 </section>
 
@@ -83,7 +83,8 @@
   <h2>SPI <span>spi/</span></h2>
   <div class="list">
     <a class="item" href="spi/nss.html"><b>Master, slave and NSS</b><p>Why only the master makes the clock, what the NSS pin means to each side, and how SSM and SSI stop a lone master from faulting. Two boards fight for the bus.</p><span class="src">programs/spi_loopback/main.c · RM0390 §26.3.4-5, §26.3.13</span><span class="st new">new style</span></a>
-    <a class="item" href="spi/rc522-memory.html"><b>RC522 memory: registers, FIFO, internal buffer</b><p>Three separate stores behind one SPI door. Send reads and writes to see which box changes, step through the first lines of the self test, and see how the chip tells an address byte from data.</p><span class="src">lib/rc522.c · MFRC522 datasheet p.10-11, p.29, p.36, p.44, p.70-73</span><span class="st new">new style</span></a>
+    <a class="item" href="spi/rc522-uid.html"><b>RC522 reading a tag: who talks to whom</b><p>One tap as three boxes: the MCU, the RC522 (timer, antenna, FIFO, flags) and the tag. Step through a read, a missing tag and a damaged reply, with a one-line sheet for each register and an XOR check-byte widget.</p><span class="src">MFRC522 p.30-62, p.70-72 · MF1S50 p.5-15</span><span class="st new">new style</span></a>
+    <a class="item" href="spi/rc522-memory.html"><b>RC522 memory: registers, FIFO, internal buffer</b><p>Three separate stores behind one SPI door. Send reads and writes to see which box changes, step through the first lines of the self test, and see how the chip tells an address byte from data.</p><span class="src">lib/devices/rc522.c · MFRC522 datasheet p.10-11, p.29, p.36, p.44, p.70-73</span><span class="st new">new style</span></a>
     <a class="item" href="spi/explorer.html"><b>SPI modes</b><p>Run a transfer in any of the four modes, give the slave the wrong CPHA to break it, and build the matching SPI_CR1 value with the clock speed.</p><span class="src">RM0390 ch. 26 · concept</span><span class="st new">new style</span></a>
   </div>
 </section>

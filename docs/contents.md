@@ -21,10 +21,16 @@ Use the `pdf-mcp` tools (`pdf_search`, `pdf_get_toc`, `pdf_read_pages`) to query
 
 | Doc | File | Pages | Index |
 |-----|------|-------|-------|
-| MFRC522 — RFID reader IC (RC522 module) | `MFRC522.pdf` | 95 | [docs/mfrc522.md](mfrc522.md) |
+| MFRC522 — RFID reader IC (RC522 module) | `MFRC522.pdf` | 95 | [docs/components/mfrc522.md](components/mfrc522.md) |
+| MF1S50 — MIFARE Classic EV1 1K tag (the cards and fobs) | `MF1S50.pdf` | 36 | [docs/components/mf1s50.md](components/mf1s50.md) |
+| MPU-6500 — 6-axis motion sensor, product specification (pins, SPI timing) | `MPU6500.pdf` | 41 | [docs/components/mpu6500.md](components/mpu6500.md) |
+| MPU-6500 — Register Map and Descriptions | `MPU6500-registers.pdf` | 47 | [docs/components/mpu6500.md](components/mpu6500.md) |
+| SN74HC595 — 8-bit shift register (SPI-like, write-only) | `sn74hc595.pdf` | 41 | [docs/components/sn74hc595.md](components/sn74hc595.md) |
 
 A component's registers come from its own datasheet, never from the STM32 SVD
 or RM0390. The STM32 side of the link (SPI, I2C, UART setup) still comes from RM0390.
+
+Parts the owner has on hand, with likely part numbers (guesses until checked): [docs/inventory.md](inventory.md).
 
 Workflow: pick a doc, open its index, then `pdf_search`/`pdf_read_pages` on demand.
 Never dump a full TOC into context — query on demand.

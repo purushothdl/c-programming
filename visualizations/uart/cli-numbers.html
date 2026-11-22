@@ -20,7 +20,7 @@
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="../index.html">lib/fmt.c <span>print and parse</span></a>
+    <a class="brand" href="../index.html">lib/core/fmt.c <span>print and parse</span></a>
     <a class="l" href="#steps">Step through</a>
     <a class="l" href="#why">Why two print functions</a>
     <a class="l" href="#gotchas">Gotchas</a>
@@ -32,7 +32,7 @@
 
 <header class="hero">
   <div>
-    <div class="eyebrow">lib/fmt.c · used by lib/cli.c</div>
+    <div class="eyebrow">lib/core/fmt.c · used by lib/core/cli.c</div>
     <h1 style="margin-top:14px">No printf, no strtol. <em>Four small functions do the job.</em></h1>
     <p class="serif">The CLI prints numbers, reads them, and splits a line into words. Each function is a few lines. Type your own input and step through the real code, one line at a time.</p>
     <div class="cta">
@@ -93,7 +93,7 @@
   </div>
 </section>
 
-<footer>Source: lib/fmt.c (lines 10–34, 36–69, 80–99), lib/cli.c · results are computed by replaying the same algorithm in JavaScript.</footer>
+<footer>Source: lib/core/fmt.c (lines 10–34, 36–69, 80–99), lib/core/cli.c · results are computed by replaying the same algorithm in JavaScript.</footer>
 </main>
 
 <script src="../shared/theme.js"></script>
@@ -202,7 +202,7 @@ var FMT = [
   "    }",
   "    return n;",
   "}"
-];   /* lib/fmt.c, line n is FMT[n - 1] */
+];   /* lib/core/fmt.c, line n is FMT[n - 1] */
 
 (function () {
   function src(a, b) {
@@ -219,9 +219,9 @@ var FMT = [
     return (n >= 0 && n <= 0xFFFFFFFF) ? n : null;
   }
   var LANES = {
-    out: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_ticks' }, { id: 'fn', t: 'function', s: 'lib/fmt.c' }, { id: 'out', t: 'put()', s: 'uart_putc or fault_putc' }],
-    parse: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_poke' }, { id: 'fn', t: 'parse_u32', s: 'lib/fmt.c' }, { id: 'out', t: '*out', s: "caller's variable" }],
-    tok: [{ id: 'caller', t: 'caller', s: 'execute()' }, { id: 'fn', t: 'tokenize', s: 'lib/fmt.c' }, { id: 'out', t: 'argv[]', s: 'word pointers' }]
+    out: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_ticks' }, { id: 'fn', t: 'function', s: 'lib/core/fmt.c' }, { id: 'out', t: 'put()', s: 'uart_putc or fault_putc' }],
+    parse: [{ id: 'caller', t: 'caller', s: 'cmd_peek, cmd_poke' }, { id: 'fn', t: 'parse_u32', s: 'lib/core/fmt.c' }, { id: 'out', t: '*out', s: "caller's variable" }],
+    tok: [{ id: 'caller', t: 'caller', s: 'execute()' }, { id: 'fn', t: 'tokenize', s: 'lib/core/fmt.c' }, { id: 'out', t: 'argv[]', s: 'word pointers' }]
   };
 
   /* ----- print_dec32 (lines 21-34) ----- */
@@ -300,7 +300,7 @@ var FMT = [
     return { id: 'parse', tab: 'parse_u32(' + shown + ')', lanes: LANES.parse, src: src(36, 69), init: { base: '—', v: '—', char: '—', result: '—' }, steps: steps };
   }
 
-  /* ----- tokenize (lines 80-99), max = 5 as in lib/cli.c ----- */
+  /* ----- tokenize (lines 80-99), max = 5 as in lib/core/cli.c ----- */
   function tokScen(str) {
     var MAX = 5, a = str.split(''), s = 0, n = 0, words = [], steps = [];
     var view = function () { return a.map(function (ch, k) { return ch === '\0' ? '␀' : ch === ' ' ? '·' : ch; }).join('') + '␀'; };
@@ -337,7 +337,7 @@ var FMT = [
     tok: ['peek 0x40020014', 'poke  0x40020014   1', 'led on', 'a b c d e f', '   ']
   };
   var fn = 'dec', inp = $('inp'), err = $('err'), seg = $('fnseg'), pre = $('presets');
-  var ctl = Seq.mount($('seq'), { file: 'lib/fmt.c', key: 'uartNumSide', lanes: LANES.out, scenarios: [decScen(1234)], src: [] });
+  var ctl = Seq.mount($('seq'), { file: 'lib/core/fmt.c', key: 'uartNumSide', lanes: LANES.out, scenarios: [decScen(1234)], src: [] });
 
   function apply() {
     err.textContent = '';

@@ -26,6 +26,18 @@ STM32 side of the SPI link. Its registers are not in the SVD.
 | Page 1: communication (ModeReg, TxControlReg, TxASKReg, ...) | 9.3.2 | 47–56 |
 | Page 2: configuration (CRCResultReg, RFCfgReg, TModeReg/TPrescalerReg, TReloadReg) | 9.3.3 | 57–62 |
 | Page 3: test (AutoTestReg, **VersionReg**) | 9.3.4 | 63–68 |
+| **Interrupt flags** (how TxIRq, RxIRq, IdleIRq, ErrIRq, TimerIRq are raised) | 8.4 | 30-31 |
+| **Timer unit** (prescaler, reload, TAuto, delay formula, 25 us example) | 8.5 | 31-32 |
+| ComIEnReg, ComIrqReg bits and the Set1 write rule | 9.3.1.3-5 | 38-40 |
+| ErrorReg (BufferOvfl, CollErr, CRCErr, ParityErr, ProtocolErr, WrErr) | 9.3.1.7 | 41 |
+| Status1Reg (TRunning, IRq, HiAlert, LoAlert) | 9.3.1.8 | 42 |
+| ControlReg (RxLastBits, TStartNow, TStopNow) | 9.3.1.13 | 45 |
+| BitFramingReg (StartSend, TxLastBits, RxAlign) and CollReg | 9.3.1.14-15 | 46-47 |
+| ModeReg, TxModeReg, RxModeReg (CRC preset, speed, CRC enable) | 9.3.2.2-4 | 48-50 |
+| TxControlReg (antenna drivers Tx1RFEn, Tx2RFEn), TxASKReg (Force100ASK) | 9.3.2.5-6 | 50-51 |
+| RFCfgReg (receiver gain) | 9.3.3.6 | 59 |
+| TModeReg, TPrescalerReg, TReloadReg (timeout setup) | 9.3.3.10-11 | 60-62 |
+| Transceive and Receive commands | 10.3.1.7-8 | 72 |
 | Command set (Idle, Mem, CalcCRC, Transmit, Receive, Transceive, MFAuthent, SoftReset) | 10 | 70–73 |
 | **Mem** (FIFO <-> 25-byte internal buffer; survives reset) and **SoftReset** (registers reset, buffer unchanged) | 10.3.1.2, 10.3.1.10 | 71, 73 |
 | Limiting values, operating conditions | 11–12 | 74 |

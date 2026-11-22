@@ -5,7 +5,7 @@
 #include "uart.h"
 
 /*
- * Step 6a: 1 kHz PWM on the LED (lib/pwm.c), duty set from the CLI.
+ * Step 6a: 1 kHz PWM on the LED (lib/core/pwm.c), duty set from the CLI.
  *
  *   duty <0-1000>   0.1 % steps: 250 is 25.0 %, 1000 is always on
  */

@@ -76,7 +76,7 @@
 <main class="wrap">
 <header class="hero">
   <div>
-    <div class="eyebrow">programs/tim_pwm · lib/pwm.c</div>
+    <div class="eyebrow">programs/tim_pwm · lib/core/pwm.c</div>
     <h1 style="margin-top:14px">A timer makes a pin wave. <em>Four gates sit between them.</em></h1>
     <p class="serif">The counter runs on its own. Each channel compares it with one number, turns the answer into a level, optionally flips it, and then either connects it to the pin or not. Change one gate and watch where the wave changes.</p>
     <div class="cta"><a class="btn dark" href="#path">Follow a channel →</a><a class="btn" href="#numbers">Build the registers</a></div>
@@ -190,7 +190,7 @@
 <section>
   <div class="sh"><div class="eyebrow">03 · init order</div><h2>pwm_init(), in order</h2></div>
   <ol class="order">
-    <li><b>PA5 to AF1</b><span>GPIOA clock, MODER5 = 10, AFSEL5 = 1 (datasheet Table 11) · lib/pwm.c 20-25</span></li>
+    <li><b>PA5 to AF1</b><span>GPIOA clock, MODER5 = 10, AFSEL5 = 1 (datasheet Table 11) · lib/core/pwm.c 20-25</span></li>
     <li><b>TIM2 clock, debug freeze</b><span>APB1ENR.TIM2EN, DBGMCU stops TIM2 while the core is halted · 31-32</span></li>
     <li><b>PSC, ARR, CCR1</b><span>PSC = 15, ARR = 999, CCR1 = duty. All preloaded: they reach the live registers only at an update event · 37-39</span></li>
     <li><b>Rule and preload</b><span>CCMR1: CC1S = 00, OC1M = 110, OC1PE = 1 · 43-44</span></li>
@@ -204,7 +204,7 @@
 <section id="gotchas">
   <div class="sh"><div class="eyebrow">04 · easy to get wrong</div><h2>Gotchas</h2></div>
   <div class="gl">
-    <div><b>CCR above ARR holds the output high</b>In PWM 1, CNT is always below CCR, so OCxREF never falls (RM0390 §17.3.9; comment at lib/pwm.c 61). CCR = 0 holds it low.</div>
+    <div><b>CCR above ARR holds the output high</b>In PWM 1, CNT is always below CCR, so OCxREF never falls (RM0390 §17.3.9; comment at lib/core/pwm.c 61). CCR = 0 holds it low.</div>
     <div><b>Flipped polarity flips the duty</b>With CCxP = 1 a 25 % setting gives 75 % at the pin. PWM 2 gives the same wave as PWM 1 with a flip.</div>
     <div><b>CCxE = 0 gives a silent pin</b>The counter and the compare keep running and OCxREF still moves. Only the gate to the pin is shut.</div>
     <div><b>Without preload the duty changes mid-period</b>With OCxPE = 0 a CCR write is used at once and the current pulse comes out short or long. With it, the new value waits for the wrap.</div>
@@ -213,7 +213,7 @@
   </div>
 </section>
 
-<footer>Source: lib/pwm.c 20-62, programs/tim_pwm/main.c · RM0390 §17.3.9 PWM mode (p. 531), §17.4.7 CCMR1 (p. 558), §17.4.9 CCER and Table 113 (p. 562) · SVD TIM2 CCMR1_Output, CCER</footer>
+<footer>Source: lib/core/pwm.c 20-62, programs/tim_pwm/main.c · RM0390 §17.3.9 PWM mode (p. 531), §17.4.7 CCMR1 (p. 558), §17.4.9 CCER and Table 113 (p. 562) · SVD TIM2 CCMR1_Output, CCER</footer>
 </main>
 
 <script src="../shared/theme.js"></script>

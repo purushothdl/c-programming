@@ -123,7 +123,7 @@ input[type=text] { width: 84px; }
 <section id="steps">
   <div class="sh"><div class="eyebrow">02 · the first four lines of the self test</div>
   <h2>Step through them</h2>
-  <p>Same model as above, driven by the real calls in <code>lib/rc522.c</code>. Stops where the datasheet stops explaining.</p></div>
+  <p>Same model as above, driven by the real calls in <code>lib/devices/rc522.c</code>. Stops where the datasheet stops explaining.</p></div>
   <div class="tabs2"><div class="seg2" id="scn"><button aria-pressed="true" data-s="ok">correct run</button><button aria-pressed="false" data-s="bad">what goes wrong</button></div></div>
   <div class="stores">
     <div class="store">
@@ -161,7 +161,7 @@ input[type=text] { width: 84px; }
   </div>
 </section>
 
-<footer>Sources: MFRC522 datasheet Rev. 3.9 (Components/MFRC522.pdf): register map p.36, CommandReg p.38, FIFO p.29 and p.44, command set p.70-71, SoftReset p.73, SPI framing p.10-11, self test p.82, AutoTestReg and VersionReg p.66, RxSelReg p.52. Code lines: lib/rc522.c. Simplified: the model only has the registers listed; FIFO overflow, empty reads and every command except Idle, Mem and SoftReset are not modelled. Assumptions, not stated in the datasheet: Mem takes the first 25 bytes in order and removes them from the FIFO; a soft reset empties the FIFO because FIFOLevelReg's reset value is 0. Nothing on this page was measured on the chip.</footer>
+<footer>Sources: MFRC522 datasheet Rev. 3.9 (Components/MFRC522.pdf): register map p.36, CommandReg p.38, FIFO p.29 and p.44, command set p.70-71, SoftReset p.73, SPI framing p.10-11, self test p.82, AutoTestReg and VersionReg p.66, RxSelReg p.52. Code lines: lib/devices/rc522.c. Simplified: the model only has the registers listed; FIFO overflow, empty reads and every command except Idle, Mem and SoftReset are not modelled. Assumptions, not stated in the datasheet: Mem takes the first 25 bytes in order and removes them from the FIFO; a soft reset empties the FIFO because FIFOLevelReg's reset value is 0. Nothing on this page was measured on the chip.</footer>
 </main>
 
 <script src="../shared/theme.js"></script>

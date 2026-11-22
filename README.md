@@ -5,7 +5,8 @@ Target: STM32F446RE on the NUCLEO-F446RE board (Cortex-M4, Thumb, ELF, bare meta
 Authoritative register reference: `svd/stm32f446re.svd` at the repo root.
 Board and chip documentation: `docs/` (start at `docs/contents.md`) and the PDFs
 under `~/Books/Hardware-and-Systems/`: `STM32/` for the MCU and board,
-`Components/` for off-board parts such as the MFRC522 RFID reader.
+`Components/` for off-board parts such as the MFRC522 RFID reader and the MF1S50 tag
+(their indexes are in `docs/components/`).
 
 ## Layout
 
@@ -14,7 +15,8 @@ startup.s      reset handler + vector table, shared by every program
 linker.ld      Flash/RAM memory layout, shared by every program
 cmsis/         CMSIS core + STM32F446xx device headers
 programs/      firmware you flash to the board: <name>.c, or <name>/ with a main.c
-lib/           shared modules (ring buffer, formatting, UART driver) for the folder programs
+lib/core/      peripheral drivers and helpers (uart, spi, clock, delay, ring, fmt, cli, pwm)
+lib/devices/   drivers for off-board parts (rc522, mpu6500), built on lib/core
 examples/      C sources compiled to assembly for study, never flashed
 build/         generated output, mirrors programs/ and examples/, gitignored
 ```
@@ -57,7 +59,9 @@ These are compiled with `-S` only. Nothing is linked or flashed.
    `programs/<name>/` containing a `main.c` and any other `.c` files.
 2. That's it: the Makefile discovers both forms, so `make <name>` works
    immediately. A folder program is built from every `.c` in its folder plus
-   every `.c` in `lib/` (unused code is dropped by `--gc-sections`).
+   every `.c` in `lib/core/` and `lib/devices/` (unused code is dropped by
+   `--gc-sections`). Name programs with a topic prefix (`tim_`, `uart_`, `rc522_`,
+   `spi_`) so related ones sort together.
 
 ## Adding a new example
 

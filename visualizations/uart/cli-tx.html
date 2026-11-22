@@ -14,7 +14,7 @@
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="../index.html">lib/uart.c <span>TX interrupt</span></a>
+    <a class="brand" href="../index.html">lib/core/uart.c <span>TX interrupt</span></a>
     <a class="l" href="#sequence">Sequence</a>
     <a class="l" href="#blocked">How long is main blocked</a>
     <a class="l" href="#gotchas">Gotchas</a>
@@ -26,7 +26,7 @@
 
 <header class="hero">
   <div>
-    <div class="eyebrow">lib/uart.c · uart_putc, USART2_IRQHandler</div>
+    <div class="eyebrow">lib/core/uart.c · uart_putc, USART2_IRQHandler</div>
     <h1 style="margin-top:14px">main queues the text. <em>The interrupt feeds the wire.</em></h1>
     <p class="serif">The wire is about a thousand times slower than the CPU. So <code>uart_putc</code> only puts the byte in a ring and flips one switch, <code>TXEIE</code>. The interrupt handler then moves one byte at a time into the USART.</p>
     <div class="cta">
@@ -37,7 +37,7 @@
   <div class="spec">
     <div><span>Peripheral</span><b>USART2 TX · PA2 · AF7</b></div>
     <div><span>Time per byte</span><b>10 bits ÷ 115200 = 86.8 µs</b></div>
-    <div><span>TX ring</span><b>64 bytes (lib/ring.h)</b></div>
+    <div><span>TX ring</span><b>64 bytes (lib/core/ring.h)</b></div>
     <div><span>Switch</span><b>CR1.TXEIE</b></div>
     <div><span>IRQ line</span><b>TXEIE AND TXE</b></div>
     <div><span>Armed</span><b>only while bytes are queued</b></div>
@@ -87,7 +87,7 @@
   </div>
 </section>
 
-<footer>Source: lib/uart.c (lines 43–50, 52–55, 81–107), lib/ring.c · RM0390 §25.4.2 and USART_SR.TXE, p. 781 and 815</footer>
+<footer>Source: lib/core/uart.c (lines 43–50, 52–55, 81–107), lib/core/ring.c · RM0390 §25.4.2 and USART_SR.TXE, p. 781 and 815</footer>
 </main>
 
 <script src="../shared/theme.js"></script>
@@ -97,7 +97,7 @@
 var $ = function (id) { return document.getElementById(id); };
 var fmt = function (n) { return n.toLocaleString('en-US'); };
 
-/* ---------- sequence (line numbers are lib/uart.c) ---------- */
+/* ---------- sequence (line numbers are lib/core/uart.c) ---------- */
 (function () {
   var SRC = [
     [43, 'void uart_putc(char c)'], [44, '{'], [45, '    while (ring_full(&g_tx)) {'], [47, '    }'], [48, '    ring_push(&g_tx, (uint8_t)c);'], [49, '    USART2->CR1 |= USART_CR1_TXEIE;       /* make sure the ISR is armed */'], [50, '}'], [0, ''],
@@ -165,7 +165,7 @@ var fmt = function (n) { return n.toLocaleString('en-US'); };
   ];
 
   Seq.mount($('seq'), {
-    file: 'lib/uart.c', key: 'uartTxSide', src: SRC, scenarios: SCEN,
+    file: 'lib/core/uart.c', key: 'uartTxSide', src: SRC, scenarios: SCEN,
     lanes: [
       { id: 'main', t: 'main', s: 'uart_putc' }, { id: 'ring', t: 'TX ring', s: 'g_tx' }, { id: 'isr', t: 'ISR', s: 'USART2_IRQHandler' },
       { id: 'usart', t: 'USART2', s: 'hardware' }, { id: 'term', t: 'Terminal', s: 'PA2 wire' }
@@ -178,8 +178,8 @@ var fmt = function (n) { return n.toLocaleString('en-US'); };
 (function () {
   var BYTE_US = 10 / 115200 * 1e6;                       /* 8N1: start + 8 data + stop = 10 bits */
   var RING = 64, SLACK = 2;                              /* ring + DR + shift register hold about 66 bytes */
-  /* strings from lib/cli.c (banner, line 132; prompt, line 27) and the usage lines of
-     lib/cli.c (19-21) and programs/uart_cli/main.c (37-38); help prints "  " + usage + "\r\n" each */
+  /* strings from lib/core/cli.c (banner, line 132; prompt, line 27) and the usage lines of
+     lib/core/cli.c (19-21) and programs/uart_cli/main.c (37-38); help prints "  " + usage + "\r\n" each */
   var banner = "\r\nSTM32F446 CLI ready. Type 'help'.\r\n" + '> ';
   var help = ['led on|off', 'ticks', 'help', 'peek <addr>', 'poke <addr> <val>'].reduce(function (n, u) { return n + 2 + u.length + 2; }, 0);
   var PRE = [['Banner', banner.length], ['help output', help], ['64 bytes', 64], ['200 bytes', 200]];

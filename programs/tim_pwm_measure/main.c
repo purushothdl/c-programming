@@ -7,7 +7,7 @@
 /*
  * Step 6d: the board measures its own PWM.
  *
- *   TIM2 CH1 (lib/pwm.c) --PA5--jumper--PA0--> TIM5 CH1 + CH2 (PWM input mode)
+ *   TIM2 CH1 (lib/core/pwm.c) --PA5--jumper--PA0--> TIM5 CH1 + CH2 (PWM input mode)
  *
  * Wiring: CN10 pin 11 (PA5) -> CN7 pin 28 (PA0). Remove the PC13 jumper from
  * tim_capture first: a press would short the PWM output to GND through B1.

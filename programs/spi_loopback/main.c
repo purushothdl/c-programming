@@ -16,7 +16,7 @@
  *   CS   PB6  GPIO Arduino D10  (software chip select, for the analyser)
  *
  * Pins: datasheet table 11 (AF5), UM1724 table 19. PA5 is also SPI1_SCK but
- * belongs to the LED and lib/pwm.c. PB3 and PB4 are JTAG pins after reset
+ * belongs to the LED and lib/core/pwm.c. PB3 and PB4 are JTAG pins after reset
  * (TRACESWO, NJTRST); SWD only needs PA13/PA14, so taking them is safe.
  *
  * SPI1 runs from APB2 = 90 MHz after clock_init(). SCK = 90 MHz / 2^(BR+1):

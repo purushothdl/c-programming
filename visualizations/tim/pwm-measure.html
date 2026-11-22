@@ -291,7 +291,7 @@
       <div>
         <b>This page</b>
         <p>programs/tim_pwm_measure/main.c</p>
-        <p>lib/pwm.c · line 61</p>
+        <p>lib/core/pwm.c · line 61</p>
         <p>Themes: Original and Claude, switch in the nav</p>
       </div>
       <div>
@@ -367,7 +367,7 @@ var fmt = function (n) { return n.toLocaleString('en-US'); };
       { f: 'main', t: 'main', label: '+1 each', kind: 'good', title: 'Add one tick to each capture', desc: 'Figure 186 shows CNT running 0 to 4 with CCR1 = 4, so a span is the captured value + 1: period 16 000 ticks, high 8 000.', code: 'uint32_t period = ccr1 + 1u;', lines: [131, 132], verdict: 'good', verdictText: 'period 1000.000 µs, high 500.000 µs, duty 500/1000. Confirm the +1 on the board.' }
     ] },
     { id: 'flat', tab: 'flat_line.seq', init: base({ 'TIM2.CCR1': '500' }), steps: [
-      { f: 'main', t: 'tim2', label: 'CCR1 = 1000', title: 'Duty 1000 is written', desc: 'The value is above ARR (999), so TIM2 never switches PA5 low (lib/pwm.c line 61).', code: 'pwm_set_duty(duty);', lines: [106], set: { 'TIM2.CCR1': '1000' } },
+      { f: 'main', t: 'tim2', label: 'CCR1 = 1000', title: 'Duty 1000 is written', desc: 'The value is above ARR (999), so TIM2 never switches PA5 low (lib/core/pwm.c line 61).', code: 'pwm_set_duty(duty);', lines: [106], set: { 'TIM2.CCR1': '1000' } },
       { f: 'tim2', t: 'pin', label: 'stays high', title: 'No falling edge, no rising edge', desc: 'PA0 stays high. No edge arrives, so the hardware never resets CNT.', code: '/* hardware */  PA0 = 1' },
       { f: 'tim5', t: 'tim5', label: 'CNT counts on', kind: 'bad', title: 'CNT climbs past 16 000 000', desc: 'Nothing resets the count, so CNT keeps going. Past 16 000 000 ticks, which is 1 s, the check on line 118 is true.', code: 'if (TIM5->CNT > NO_EDGE_TICKS)', lines: [118], set: { 'TIM5.CNT': '> 16 000 000' } },
       { f: 'tim5', t: 'main', label: 'no edges', title: 'measure reports the pin', desc: 'It prints "stuck high" and skips the capture reads. The old CCR values are not shown.', code: 'uart_puts("no edges for 1 s: pin stuck ");', lines: [119, 120], verdict: 'good', verdictText: 'The check works while CNT is under 2^32. The wrap tab shows where it stops.' }

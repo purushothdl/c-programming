@@ -8,7 +8,7 @@ Pick lessons that answer real questions about the program. Each entry gives when
 
 ```js
 var ctl = Seq.mount(document.getElementById('seq'), {
-  file: 'lib/uart.c',                 // shown above the code sheet
+  file: 'lib/core/uart.c',                 // shown above the code sheet
   key: 'uartTxSide',                  // localStorage key for the divider width
   lanes: [{ id, t, s }],              // columns: id, title, subtitle. 3 to 5 lanes read best
   src: [[lineNo, 'exact source text'], [0, ''] /* gap */, [-1, 'LABEL'] /* section header */],
