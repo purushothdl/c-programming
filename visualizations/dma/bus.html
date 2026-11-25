@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMA, who moves the data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+[hidden] { display: none !important; }
+.seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+.seg2 button { font: 400 12px "Inter", sans-serif; padding: 6px 12px; border: 0; background: var(--card); color: var(--ink-2); cursor: pointer; }
+.seg2 button[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); }
+.ctl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ctl .n { margin-left: auto; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+
+.box { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 10px 12px; min-width: 0; transition: border-color .2s; }
+.box.on { border-color: var(--ember); }
+.box h3 { margin: 0 0 2px; font: 500 13px "Inter", sans-serif; color: var(--ink); display: flex; justify-content: space-between; gap: 6px; }
+.box h3 span { font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.box p { margin: 0; font-size: 12px; color: var(--ink-2); }
+.say { margin-top: 8px; font: 500 12px "JetBrains Mono", monospace; color: var(--ink); min-height: 18px; }
+.tile { border: 1px solid var(--line-2); border-radius: 4px; background: var(--card-2); padding: 8px 10px; min-width: 0; }
+.tile b { display: block; font: 500 10px "Inter", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.tile .v { font: 500 13px "JetBrains Mono", monospace; color: var(--ink); min-height: 18px; }
+.tile .v small { display: block; font: 400 10.5px "Inter", sans-serif; color: var(--ink-3); }
+.tile.hit { animation: hit .8s ease-out; }
+@keyframes hit { from { box-shadow: 0 0 0 2px var(--ember); } to { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .tile.hit { animation: none; } }
+.inner { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.lamp { display: flex; align-items: center; gap: 6px; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.lamp i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); flex: none; }
+.lamp.on { color: var(--ink); }
+.lamp.on i { background: var(--ember); border-color: var(--ember); }
+.lamp.bad.on i { background: var(--bad); border-color: var(--bad); }
+
+/* scene 1: one road */
+.rd { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bus { margin: 8px 0 0; border: 2px solid var(--line); border-radius: 4px; padding: 6px 10px; text-align: center; font: 500 12px "JetBrains Mono", monospace; color: var(--ink-3); background: var(--card); }
+.bus.cpu, .bus.dma { border-color: var(--ember); color: var(--ink); }
+.slots { display: flex; flex-wrap: wrap; gap: 2px; margin: 12px 0 6px; }
+.slots i { width: 18px; height: 26px; border: 1px solid var(--line); border-radius: 2px; background: var(--card-2); font: 500 10px/24px "JetBrains Mono", monospace; font-style: normal; text-align: center; color: var(--ink-3); }
+.slots i.cpu { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.slots i.dma { background: var(--ember); color: var(--btn-ink); border-color: var(--ember); }
+.slots i.dmaw { background: var(--ember); color: var(--btn-ink); border-color: var(--ember); box-shadow: 0 3px 0 -1px var(--bad); }
+.slots i.comp { background: var(--card); }
+.slots i.cur { outline: 2px solid var(--ink); outline-offset: 1px; }
+.slots i.fut { opacity: .35; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font: 400 11px "Inter", sans-serif; color: var(--ink-2); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); background: var(--card-2); }
+.legend .l-cpu::before { background: var(--btn); border-color: var(--btn); }
+.legend .l-dma::before { background: var(--ember); border-color: var(--ember); }
+.legend .l-wait::before { background: var(--ember); border-color: var(--ember); box-shadow: 0 3px 0 -1px var(--bad); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+
+/* scene 2: bus matrix */
+.mx { display: grid; gap: 6px; }
+.mr { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 8px 10px; }
+.mr b { font: 500 13px "Inter", sans-serif; color: var(--ink); display: block; }
+.mr b span { display: block; font: 400 11px "JetBrains Mono", monospace; color: var(--ink-3); }
+.mr .tg2 { display: flex; gap: 4px; flex-wrap: wrap; }
+.mr button { font: 400 12px "Inter", sans-serif; border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--ink-2); padding: 5px 10px; cursor: pointer; }
+.mr button[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.rounds { width: 100%; border-collapse: collapse; margin-top: 10px; font: 400 12px "JetBrains Mono", monospace; }
+.rounds th, .rounds td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; white-space: normal; }
+.rounds th:first-child, .rounds td:first-child { text-align: left; font-family: "Inter", sans-serif; }
+.rounds td.ok { color: var(--ink); background: var(--card-2); }
+.rounds td.wt { color: var(--bad); }
+.rounds td.cnt { font-weight: 500; color: var(--ink); }
+.coll { margin-top: 8px; font-size: 13px; }
+.coll .bad { color: var(--bad); }
+
+/* scene 3: one request */
+.arena { display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1.25fr) 96px minmax(0, 1.15fr); gap: 0; align-items: stretch; margin-top: 10px; }
+.link { display: grid; place-items: center; text-align: center; font: 400 10px "JetBrains Mono", monospace; color: var(--ink-3); position: relative; gap: 2px; padding: 6px 0; }
+.link .a { position: relative; background: var(--bg); padding: 0 4px; color: var(--ink-3); }
+.link .a.on { color: var(--ember); font-weight: 500; }
+.link::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed var(--line); }
+.cells { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+.cells i { font: 500 11px "JetBrains Mono", monospace; font-style: normal; border: 1px solid var(--line); border-radius: 2px; padding: 3px 5px; color: var(--ink-3); background: var(--card-2); }
+.cells i.done { opacity: .45; }
+.cells i.next { border-color: var(--ember); color: var(--ink); background: color-mix(in srgb, var(--ember) 12%, var(--card)); }
+.cap { margin-top: 12px; border: 1px solid var(--line); border-left: 2px solid var(--ember); border-radius: 4px; background: var(--card); padding: 12px 14px; display: grid; gap: 8px; }
+.cap h3 { margin: 0; font: 500 15px "Inter", sans-serif; color: var(--ink); }
+.cap p { margin: 0; font-size: 13.5px; color: var(--ink); max-width: 60em; }
+.wrote { display: flex; flex-wrap: wrap; gap: 6px; }
+.strip { display: flex; gap: 3px; margin: 12px 0 0; flex-wrap: wrap; }
+.strip button { font: 400 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-radius: 3px; background: var(--card); color: var(--ink-3); padding: 4px 8px; cursor: pointer; }
+.strip button.done { color: var(--ink-2); }
+.strip button.cur { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.verdict { padding: 8px 12px; border-radius: 4px; font-size: 13px; border: 1px solid var(--line); }
+.verdict.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.verdict.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+@media (max-width: 900px) {
+  .rd, .stats { grid-template-columns: 1fr; }
+  .mr { grid-template-columns: 1fr; }
+  .arena { grid-template-columns: 1fr; }
+  .link { height: 52px; } .link::before { left: 50%; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 2px dashed var(--line); }
+}
+</style>
+<script src="../shared/themes.js"></script>
+</head>
+<body>
+<nav><div class="wrap"><a class="brand" href="../index.html">DMA <span>dma/</span></a><a class="l" href="#road">one road</a><a class="l" href="#matrix">many roads</a><a class="l" href="#request">one request</a><button class="tg" id="theme"></button></div></nav>
+<main class="wrap">
+
+<section id="road">
+  <div class="sh"><div class="eyebrow">01 · one road</div>
+  <h1 style="font-size:36px">When the CPU and a DMA share <em>one</em> bus</h1>
+  <p>Each square is one memory access, called a slot. In one slot only one master can use the road. Pick how the DMA shares it and press Play. This is the old shared-bus picture from the video, as a toy model.</p></div>
+
+  <div class="ctl" style="margin-bottom:10px">
+    <div class="seg2" id="pol">
+      <button aria-pressed="false" data-p="none">no DMA</button>
+      <button aria-pressed="true" data-p="burst">DMA burst</button>
+      <button aria-pressed="false" data-p="steal">cycle stealing</button>
+      <button aria-pressed="false" data-p="transparent">transparent</button>
+    </div>
+    <button class="btn dark sm" id="rplay">Play</button><button class="btn ghost sm" id="rstep">Step</button><button class="btn sm" id="rreset">Reset</button>
+  </div>
+
+  <div class="rd">
+    <div class="box" id="rcpu"><h3>CPU <span>master</span></h3><p>Runs our program: two memory accesses, then a moment of thinking.</p><div class="say" id="rcpus"></div></div>
+    <div class="box" id="rdma"><h3>DMA <span>master</span></h3><p id="rdmap"></p><div class="say" id="rdmas"></div></div>
+    <div class="box"><h3>RAM <span>one road in</span></h3><p>Both masters need it. Only one gets the road per slot.</p></div>
+  </div>
+  <div class="bus" id="rbus">bus: free</div>
+  <div class="slots" id="slots"></div>
+  <div class="legend"><span class="l-cpu">CPU uses the bus</span><span class="l-dma">DMA uses the bus</span><span class="l-wait">DMA slot while the CPU was waiting</span><span>CPU thinking, bus free</span></div>
+  <div class="stats">
+    <div class="tile"><b>CPU finishes at slot</b><div class="v" id="sc"></div></div>
+    <div class="tile"><b>Slots the CPU waited</b><div class="v" id="sw"></div></div>
+    <div class="tile"><b>DMA copy done at slot</b><div class="v" id="sd"></div></div>
+  </div>
+  <p class="note" style="margin-top:10px">Toy model, not clock cycles. The CPU needs 24 accesses (two, then a thinking slot, repeated). The DMA copies 4 words, which is 8 accesses (read, then write), starting at slot 6. Burst takes 8 slots in a row. Cycle stealing takes every second slot. Transparent only uses slots the CPU does not need.</p>
+</section>
+
+<section id="matrix">
+  <div class="sh"><div class="eyebrow">02 · our chip: many roads</div>
+  <h2>The bus matrix</h2>
+  <p>The STM32F446 has separate paths to Flash, SRAM1, SRAM2 and the peripherals (RM0390 Figure 1, p.54). Pick what each master wants. Two masters only collide when they want the <b>same</b> target. Then the matrix takes turns, round-robin (p.55).</p></div>
+
+  <div class="ctl" style="margin-bottom:10px"><span class="note" style="margin:0">Presets:</span>
+    <div class="seg2" id="pre">
+      <button aria-pressed="true" data-n="a">DMA buffer in SRAM2</button>
+      <button aria-pressed="false" data-n="b">DMA buffer in SRAM1, with the CPU's data</button>
+      <button aria-pressed="false" data-n="c">three want SRAM1</button>
+      <button aria-pressed="false" data-n="d">CPU polls the peripherals</button>
+    </div>
+  </div>
+  <div class="mx" id="mx"></div>
+  <table class="rounds" id="rounds"></table>
+  <div class="coll" id="coll"></div>
+  <p class="note" style="margin-top:10px">Simplified: every master asks for its target in every round and one access is served per target per round. DMA1 is left out (its peripheral port goes straight to the APB bridges in Figure 1) and so is the USB OTG HS DMA (the text and the figure disagree about its route to Flash).</p>
+</section>
+
+<section id="request">
+  <div class="sh"><div class="eyebrow">03 · one request</div>
+  <h2>How the DMA sends bytes out of the SPI</h2>
+  <p>The CPU sets it up once. After that the SPI asks for each byte and the DMA delivers it. This is the sequence our next program will use, on DMA2 stream 3 and SPI1. The bytes are the first six digits of the table in <code>programs/sr595</code>.</p></div>
+
+  <div class="ctl" style="margin-bottom:10px"><div class="seg2" id="scn">
+    <button aria-pressed="true" data-s="ok">it works</button>
+    <button aria-pressed="false" data-s="bug">what goes wrong: TXDMAEN left at 0</button></div></div>
+
+  <div class="box" id="bcpu"><h3>CPU <span>our code</span></h3><div class="say" id="cpus"></div></div>
+  <div class="arena">
+    <div class="box" id="bsram"><h3>SRAM <span>the buffer</span></h3><p>Six bytes to send.</p><div class="cells" id="cells"></div><div class="say" id="sramn"></div></div>
+    <div class="link" id="l1"><span class="a" id="a1">read →</span></div>
+    <div class="box" id="bdma"><h3>DMA2 stream 3 <span>channel 3</span></h3>
+      <div class="inner">
+        <div class="tile" id="tn"><b>Counter (NDT)</b><div class="v" id="vn"></div></div>
+        <div class="tile" id="tp"><b>Memory pointer</b><div class="v" id="vp"></div></div>
+        <div class="tile" id="te"><b>Stream</b><div class="v" id="ve"></div></div>
+        <div class="tile" id="tf"><b>Flag</b><div class="lamp" id="vf"></div></div>
+      </div></div>
+    <div class="link" id="l2"><span class="a" id="a2">write DR →</span><span class="a" id="a3">← request</span></div>
+    <div class="box" id="bspi"><h3>SPI1 <span>APB2</span></h3>
+      <div class="inner">
+        <div class="tile" id="ta"><b>TXDMAEN</b><div class="v" id="va"></div></div>
+        <div class="tile" id="tt"><b>TXE (buffer empty)</b><div class="v" id="vt"></div></div>
+        <div class="tile" id="td"><b>Data register</b><div class="v" id="vd"></div></div>
+        <div class="tile" id="ts"><b>Shift register</b><div class="v" id="vs"></div></div>
+      </div></div>
+  </div>
+
+  <div class="cap"><h3 id="ct"></h3><p id="cd"></p><div class="wrote" id="cw"></div><div id="cv"></div>
+    <div class="ctl"><button class="btn ghost sm" id="bp">← Back</button><button class="btn dark sm" id="bn">Next →</button><button class="btn sm" id="brs">Reset</button><button class="btn ghost sm" id="bpl">Play</button><span class="n" id="bc"></span></div></div>
+  <div class="strip" id="strip"></div>
+  <p class="note" style="margin-top:10px">The buffer address <code>0x20000100</code> is made up for the picture. The addresses of the stream registers and <code>SPI1_DR</code> are real (SVD). The model shows the order of events, not the clock timing.</p>
+</section>
+
+<section id="traps">
+  <div class="sh"><div class="eyebrow">04 · three things to remember for the code</div><h2>What the manual says</h2></div>
+  <div class="three">
+    <div class="card"><b>SPI1 is on DMA2 only</b>SPI1_TX is DMA2 stream 3 or stream 5, channel 3. DMA1 has no SPI1 request (Table 29 p.204 and Table 28).</div>
+    <div class="card"><b>Set it up while EN is 0</b>The direction bits can only be written while the stream is disabled (p.227). The counter can only be written while disabled too (p.228). A counter of zero serves no request, even with the stream on.</div>
+    <div class="card"><b>"Complete" is not "sent"</b>When the DMA flag TCIF sets, the SPI is still shifting the last byte. Wait for TXE = 1, then BSY = 0, before you change CS or disable the SPI (p.840). The order for starting: stream first, then TXDMAEN, then SPE.</div>
+  </div>
+</section>
+
+<footer>Sources: RM0390 Rev 9: DMA features p.200, bus matrix and masters p.53-55 (Figure 1 on p.54), DMA request mapping Table 28 and Table 29 p.204, direction bits p.227, NDT p.228, SPI DMA p.840 and SPI_CR2 TXDMAEN p.868. SVD (STM32F446): DMA2 S3CR 0x40026458 (EN bit 0, DIR bits 7:6, MINC bit 10, CHSEL bits 27:25), S3NDTR 0x4002645C, S3PAR 0x40026460, S3M0AR 0x40026464, LISR TCIF3 bit 27, SPI1 CR2 TXDMAEN bit 1. Nothing here was measured on the board. Scene 1 is an illustrative toy model, and its modes (burst, cycle stealing, transparent) come from the video, not from RM0390: no such choice exists on this chip. Scene 2 uses one access per round and leaves out DMA1 and USB.</footer>
+</main>
+
+<script src="../shared/theme.js"></script>
+<script>
+(function () {
+  function hx(v) { return ('00' + v.toString(16).toUpperCase()).slice(-2); }
+  function $(id) { return document.getElementById(id); }
+
+  /* ================= scene 1: one road (toy model) ================= */
+  var CPU_ACC = 24, DMA_ACC = 8, DMA_START = 6;
+  function simRoad(policy) {
+    var owner = [], remaining = CPU_ACC, c = 0, dmaLeft = policy === 'none' ? 0 : DMA_ACC;
+    var cpuDone = null, dmaDone = null, waits = 0, t = 0;
+    while ((remaining > 0 || dmaLeft > 0) && t < 200) {
+      var cpuWants = remaining > 0 && c % 3 !== 2;
+      var thinking = remaining > 0 && c % 3 === 2;
+      var dmaWants = false;
+      if (dmaLeft > 0 && t >= DMA_START) {
+        if (policy === 'burst') dmaWants = true;
+        else if (policy === 'steal') dmaWants = ((t - DMA_START) % 2 === 0);
+        else if (policy === 'transparent') dmaWants = !cpuWants;
+      }
+      var o;
+      if (dmaWants) {
+        o = 'dma'; dmaLeft--; if (dmaLeft === 0) dmaDone = t + 1;
+        if (cpuWants) { o = 'dmaw'; waits++; } else if (thinking) { c++; }
+      } else if (cpuWants) {
+        o = 'cpu'; remaining--; c++; if (remaining === 0) cpuDone = t + 1;
+      } else if (thinking) { o = 'comp'; c++; } else { o = 'free'; }
+      owner.push(o); t++;
+    }
+    return { owner: owner, cpuDone: cpuDone, dmaDone: dmaDone, waits: waits };
+  }
+  var pol = 'burst', rs, rcur = 0, rtimer = null;
+  var BASE = simRoad('none').cpuDone;
+  function rdraw() {
+    var o = rs.owner, h = '';
+    o.forEach(function (x, i) {
+      var cls = (x === 'cpu' ? 'cpu' : x === 'dma' ? 'dma' : x === 'dmaw' ? 'dmaw' : x === 'comp' ? 'comp' : '') + (i === rcur ? ' cur' : '') + (i > rcur ? ' fut' : '');
+      h += '<i class="' + cls + '" title="slot ' + (i + 1) + '">' + (x === 'cpu' ? 'C' : (x === 'dma' || x === 'dmaw') ? 'D' : '') + '</i>';
+    });
+    $('slots').innerHTML = h;
+    var cur = o[rcur];
+    $('rcpu').classList.toggle('on', cur === 'cpu');
+    $('rdma').classList.toggle('on', cur === 'dma' || cur === 'dmaw');
+    $('rbus').className = 'bus ' + (cur === 'cpu' ? 'cpu' : (cur === 'dma' || cur === 'dmaw') ? 'dma' : '');
+    $('rbus').textContent = 'slot ' + (rcur + 1) + ' · bus: ' + (cur === 'cpu' ? 'CPU' : (cur === 'dma' || cur === 'dmaw') ? 'DMA' : 'free');
+    $('rcpus').textContent = cur === 'cpu' ? 'using the bus' : cur === 'dmaw' ? 'waiting for the bus' : cur === 'comp' ? 'thinking' : cur === 'dma' ? 'thinking, or done' : '';
+    $('rdmap').textContent = pol === 'none' ? 'Not used in this run.' : pol === 'burst' ? 'Takes the road for 8 slots in a row, then leaves.' : pol === 'steal' ? 'Takes one slot, lets the CPU have one, and so on.' : 'Only uses slots the CPU does not need.';
+    $('rdmas').textContent = (cur === 'dma' || cur === 'dmaw') ? 'moving a word' : '';
+    $('sc').innerHTML = rs.cpuDone + '<small>alone: ' + BASE + '</small>';
+    $('sw').innerHTML = rs.waits + '<small>' + (rs.waits === 0 ? 'the CPU never waited' : 'slots lost to the DMA') + '</small>';
+    $('sd').innerHTML = rs.dmaDone === null ? 'no DMA' : rs.dmaDone + '<small>' + (rs.dmaDone - DMA_START) + ' slots after it started</small>';
+  }
+  function rstop() { if (rtimer) { clearInterval(rtimer); rtimer = null; } $('rplay').textContent = 'Play'; }
+  function rsetup(p) { pol = p; rs = simRoad(p); rcur = 0; rstop(); rdraw(); }
+  $('pol').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    [].forEach.call(this.children, function (c) { c.setAttribute('aria-pressed', c === b ? 'true' : 'false'); });
+    rsetup(b.dataset.p);
+  });
+  $('rplay').onclick = function () {
+    if (rtimer) { rstop(); return; }
+    if (rcur >= rs.owner.length - 1) rcur = 0;
+    $('rplay').textContent = 'Pause';
+    rtimer = setInterval(function () { if (rcur < rs.owner.length - 1) { rcur++; rdraw(); } else { rstop(); } }, 240);
+  };
+  $('rstep').onclick = function () { rstop(); if (rcur < rs.owner.length - 1) rcur++; rdraw(); };
+  $('rreset').onclick = function () { rstop(); rcur = 0; rdraw(); };
+
+  /* ================= scene 2: bus matrix ================= */
+  var MS = [
+    { id: 'icode', name: 'CPU fetching code', port: 'I-bus', allow: ['flash', 'sram1'] },
+    { id: 'sdata', name: 'CPU data', port: 'S-bus', allow: ['sram1', 'sram2', 'per'] },
+    { id: 'dmam', name: 'DMA2 memory port', port: 'DMA_MEM2', allow: ['flash', 'sram1', 'sram2'] },
+    { id: 'dmap', name: 'DMA2 peripheral port', port: 'DMA_P2', allow: ['per', 'sram1', 'sram2', 'flash'] }
+  ];
+  var SLN = { flash: 'Flash', sram1: 'SRAM1', sram2: 'SRAM2', per: 'Peripherals' };
+  var PRE = {
+    a: { icode: 'flash', sdata: 'sram1', dmam: 'sram2', dmap: 'per' },
+    b: { icode: 'flash', sdata: 'sram1', dmam: 'sram1', dmap: 'per' },
+    c: { icode: 'sram1', sdata: 'sram1', dmam: 'sram1', dmap: 'per' },
+    d: { icode: 'flash', sdata: 'per', dmam: 'sram1', dmap: 'per' }
+  };
+  var sel = JSON.parse(JSON.stringify(PRE.a)), ROUNDS = 8;
+  function runRounds() {
+    var last = {}, res = MS.map(function () { return []; });
+    for (var r = 0; r < ROUNDS; r++) {
+      var served = {};
+      Object.keys(SLN).forEach(function (s) {
+        var asking = []; MS.forEach(function (m, i) { if (sel[m.id] === s) asking.push(i); });
+        if (!asking.length) return;
+        var from = last[s] === undefined ? -1 : last[s], pick = null;
+        for (var k = 1; k <= MS.length; k++) { var idx = (from + k) % MS.length; if (asking.indexOf(idx) >= 0) { pick = idx; break; } }
+        last[s] = pick; served[pick] = true;
+      });
+      MS.forEach(function (m, i) { res[i].push(!!served[i]); });
+    }
+    return res;
+  }
+  function mdraw() {
+    var h = '';
+    MS.forEach(function (m) {
+      h += '<div class="mr"><b>' + m.name + '<span>' + m.port + '</span></b><div class="tg2" data-m="' + m.id + '">';
+      m.allow.forEach(function (s) { h += '<button aria-pressed="' + (sel[m.id] === s) + '" data-s="' + s + '">' + SLN[s] + '</button>'; });
+      h += '</div></div>';
+    });
+    $('mx').innerHTML = h;
+    [].forEach.call(document.querySelectorAll('#mx button'), function (b) {
+      b.onclick = function () { sel[b.parentNode.dataset.m] = b.dataset.s; setPre(null); mdraw(); };
+    });
+    var res = runRounds(), t = '<tr><th>master</th>';
+    for (var r = 1; r <= ROUNDS; r++) t += '<th>' + r + '</th>';
+    t += '<th>served</th></tr>';
+    MS.forEach(function (m, i) {
+      var n = res[i].filter(Boolean).length;
+      t += '<tr><td>' + m.name + ' → ' + SLN[sel[m.id]] + '</td>';
+      res[i].forEach(function (x) { t += '<td class="' + (x ? 'ok' : 'wt') + '">' + (x ? '✓' : 'wait') + '</td>'; });
+      t += '<td class="cnt">' + n + ' / ' + ROUNDS + '</td></tr>';
+    });
+    $('rounds').innerHTML = t;
+    var by = {}; MS.forEach(function (m) { (by[sel[m.id]] = by[sel[m.id]] || []).push(m.name); });
+    var cl = Object.keys(by).filter(function (s) { return by[s].length > 1; });
+    $('coll').innerHTML = cl.length ? cl.map(function (s) { return '<span class="bad">Collision at ' + SLN[s] + ':</span> ' + by[s].join(' and ') + ' take turns.'; }).join('<br>') : 'No collision: every master has its own target, so all four run at full speed at once.';
+  }
+  function setPre(n) { [].forEach.call($('pre').children, function (c) { c.setAttribute('aria-pressed', n && c.dataset.n === n ? 'true' : 'false'); }); }
+  $('pre').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    sel = JSON.parse(JSON.stringify(PRE[b.dataset.n])); setPre(b.dataset.n); mdraw();
+  });
+
+  /* ================= scene 3: one request ================= */
+  var BUF = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D];
+  var N = BUF.length;
+  function fresh() { return { cpu: 'nothing done yet', en: false, par: false, m0: false, ndtr: null, ptr: 0, txdmaen: false, spe: false, txe: true, dr: null, shift: null, tcif: false, flow: null }; }
+  function S(t, d, o) { o.t = t; o.d = d; return o; }
+  function cfg() {
+    return S('The CPU configures the stream', 'While the stream is off, the CPU writes where to read (the buffer), where to write (the SPI data register), how many items, and which request to listen to: channel 3, direction memory to peripheral, memory address goes up by one each time.',
+      { chips: ['S3PAR ← SPI1_DR (0x4001300C)', 'S3M0AR ← 0x20000100', 'S3NDTR ← 6', 'S3CR: CHSEL = 3, DIR = 01, MINC = 1'], ap: function (m) { m.par = true; m.m0 = true; m.ndtr = 6; m.cpu = 'writing the setup'; } });
+  }
+  function build(kind) {
+    var s = [cfg()];
+    if (kind === 'bug') {
+      s.push(S('Enable the stream and the SPI, but forget TXDMAEN', 'The stream is on (EN = 1) and the SPI is on (SPE = 1). The line that tells the SPI to ask the DMA for data, TXDMAEN, stays 0.', { chips: ['S3CR.EN ← 1', 'SPI1_CR1.SPE ← 1'], ap: function (m) { m.en = true; m.spe = true; m.cpu = 'thinks it is done'; } }));
+      s.push(S('TXE is 1, but nobody asks', 'The buffer is empty (TXE = 1), but the SPI only raises a DMA request when TXDMAEN is 1 (p.868). The stream waits. The counter stays at 6.', { chips: [], ap: function (m) { m.cpu = 'free'; } }));
+      s.push(S('The program waits for the finish flag', 'The CPU waits for TCIF3, the DMA flag that says all items are done. It will never set, because nothing was sent. The program hangs here.', { chips: [], verdict: ['bad', 'Stuck: counter still 6, TCIF3 never sets, nothing on the wire.'], ap: function (m) { m.cpu = 'waiting for TCIF3 … forever'; } }));
+      return s;
+    }
+    s.push(S('Enable the stream, then tell the SPI to ask', 'In this order (p.840): the stream first, then TXDMAEN, then SPE. From here the CPU is free to do other work.', { chips: ['S3CR.EN ← 1', 'SPI1_CR2.TXDMAEN ← 1', 'SPI1_CR1.SPE ← 1'], ap: function (m) { m.en = true; m.txdmaen = true; m.spe = true; m.cpu = 'free: not involved from here'; } }));
+    for (var i = 0; i < N; i++) {
+      (function (i) {
+        s.push(S('Byte ' + (i + 1) + ': the SPI asks', (i === 0 ? 'The SPI buffer is empty (TXE = 1) and TXDMAEN = 1, so it raises a DMA request. ' : 'The SPI moved the last byte into its shift register and the buffer is empty again (TXE = 1). It raises a DMA request. ') + 'One request means one item (p.840).', {
+          flow: 'ask', chips: [], ap: function (m) { m.txe = true; m.dr = null; m.shift = i === 0 ? null : BUF[i - 1]; } }));
+        s.push(S('Byte ' + (i + 1) + ': the DMA moves it', 'The DMA reads ' + hx(BUF[i]) + ' from the buffer and writes it to SPI1_DR. The memory pointer goes up by one and the counter goes down by one. TXE drops to 0 until the SPI takes the byte.' + (i === N - 1 ? ' The counter hits 0, so the DMA sets TCIF3.' : ''), {
+          flow: 'move', chips: [], ap: function (m) { m.dr = BUF[i]; m.txe = false; m.ptr = i + 1; m.ndtr = N - (i + 1); if (i === N - 1) m.tcif = true; } }));
+      })(i);
+    }
+    s.push(S('The last byte shifts out', 'TCIF3 is on, but the SPI is still shifting the last byte. Wait for TXE = 1, then BSY = 0 (p.840). Only then is the transfer really over, and it is safe to raise CS (for the 595, that is the latch).', {
+      chips: [], verdict: ['ok', 'All 6 bytes sent with no CPU work per byte.'], ap: function (m) { m.shift = BUF[N - 1]; m.dr = null; m.txe = true; m.cpu = 'sees TCIF3, waits TXE then BSY'; } }));
+    return s;
+  }
+  var scn = 'ok', steps, snaps, si, ptimer = null;
+  function recompute() {
+    steps = build(scn); snaps = []; var m = fresh();
+    steps.forEach(function (s) { var pre = JSON.parse(JSON.stringify(m)); m.flow = s.flow || null; s.ap(m); snaps.push({ m: JSON.parse(JSON.stringify(m)), pre: pre }); });
+  }
+  function lamp(on, name, cls) { return '<span class="lamp ' + (cls || '') + (on ? ' on' : '') + '"><i></i>' + name + '</span>'; }
+  function draw() {
+    var m = snaps[si].m, pre = snaps[si].pre, s = steps[si];
+    $('cpus').textContent = m.cpu;
+    $('bcpu').classList.toggle('on', si <= 1 && scn === 'ok' || /waiting for TCIF3/.test(m.cpu));
+    var cells = ''; BUF.forEach(function (b, i) { cells += '<i class="' + (i < m.ptr ? 'done' : i === m.ptr && m.par && m.ptr < N ? 'next' : '') + '">' + hx(b) + '</i>'; });
+    $('cells').innerHTML = cells;
+    $('sramn').textContent = m.ptr < N ? 'next to read: item ' + (m.ptr + 1) : 'all read';
+    $('vn').innerHTML = m.ndtr === null ? '—<small>not set</small>' : m.ndtr + '<small>items left</small>';
+    $('vp').innerHTML = m.m0 ? '0x20000' + (0x100 + m.ptr).toString(16).toUpperCase() + '<small>M0AR + ' + m.ptr + '</small>' : '—<small>not set</small>';
+    $('ve').innerHTML = m.en ? 'ON<small>EN = 1</small>' : 'OFF<small>EN = 0</small>';
+    $('vf').innerHTML = lamp(m.tcif, 'TCIF3: complete');
+    $('va').innerHTML = m.txdmaen ? '1<small>asks the DMA</small>' : '0<small>does not ask</small>';
+    $('vt').innerHTML = (m.txe ? '1' : '0') + '<small>' + (m.txe ? 'empty' : 'holds a byte') + '</small>';
+    $('vd').innerHTML = m.dr === null ? '—' : hx(m.dr);
+    $('vs').innerHTML = m.shift === null ? '—<small>idle</small>' : hx(m.shift) + '<small>going out on MOSI</small>';
+    var ask = s.flow === 'ask', mv = s.flow === 'move';
+    $('a1').classList.toggle('on', mv); $('a2').classList.toggle('on', mv); $('a3').classList.toggle('on', ask);
+    $('bsram').classList.toggle('on', mv); $('bdma').classList.toggle('on', ask || mv || si === 0);
+    $('bspi').classList.toggle('on', ask || mv);
+    [['tn', m.ndtr !== pre.ndtr], ['tp', m.ptr !== pre.ptr], ['te', m.en !== pre.en], ['tf', m.tcif !== pre.tcif], ['ta', m.txdmaen !== pre.txdmaen], ['tt', m.txe !== pre.txe], ['td', m.dr !== pre.dr], ['ts', m.shift !== pre.shift]].forEach(function (x) {
+      var e = $(x[0]); e.classList.remove('hit'); if (x[1]) { void e.offsetWidth; e.classList.add('hit'); }
+    });
+    $('ct').textContent = (si + 1) + ' · ' + s.t;
+    $('cd').textContent = s.d;
+    $('cw').innerHTML = (s.chips || []).map(function (c) { return '<span class="chip">' + c + '</span>'; }).join('') || '<span class="note">no register writes in this step</span>';
+    $('cv').innerHTML = s.verdict ? '<div class="verdict ' + s.verdict[0] + '">' + s.verdict[1] + '</div>' : '';
+    $('bc').textContent = (si + 1) + ' / ' + steps.length;
+    $('bp').disabled = si === 0; $('bn').disabled = si === steps.length - 1;
+    var st = ''; steps.forEach(function (x, i) { st += '<button data-i="' + i + '" class="' + (i === si ? 'cur' : i < si ? 'done' : '') + '" title="' + x.t.replace(/"/g, '') + '">' + (i + 1) + '</button>'; });
+    $('strip').innerHTML = st;
+    [].forEach.call(document.querySelectorAll('#strip button'), function (b) { b.onclick = function () { pstop(); go(+b.dataset.i); }; });
+  }
+  function go(i) { si = Math.max(0, Math.min(steps.length - 1, i)); draw(); }
+  function pstop() { if (ptimer) { clearInterval(ptimer); ptimer = null; } $('bpl').textContent = 'Play'; }
+  $('bn').onclick = function () { pstop(); go(si + 1); };
+  $('bp').onclick = function () { pstop(); go(si - 1); };
+  $('brs').onclick = function () { pstop(); go(0); };
+  $('bpl').onclick = function () {
+    if (ptimer) { pstop(); return; }
+    if (si >= steps.length - 1) go(0);
+    $('bpl').textContent = 'Pause';
+    ptimer = setInterval(function () { if (si < steps.length - 1) go(si + 1); else pstop(); }, 900);
+  };
+  $('scn').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return; pstop(); scn = b.dataset.s;
+    [].forEach.call(this.children, function (c) { c.setAttribute('aria-pressed', c === b ? 'true' : 'false'); });
+    recompute(); go(0);
+  });
+
+  rsetup('burst'); mdraw(); recompute(); go(0);
+  window.DMA = { road: simRoad, rounds: runRounds, sel: function () { return sel; }, steps: function () { return steps; }, snaps: function () { return snaps; }, go: go, setScn: function (x) { scn = x; recompute(); go(0); }, base: BASE };
+})();
+</script>
+</body>
+</html>

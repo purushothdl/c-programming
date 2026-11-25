@@ -90,6 +90,13 @@
 </section>
 
 <section class="group">
+  <h2>DMA <span>dma/</span></h2>
+  <div class="list">
+    <a class="item" href="dma/bus.html"><b>DMA: who moves the data</b><p>Three scenes. One shared road (burst, cycle stealing, transparent) as a toy model. The STM32F446 bus matrix, where masters collide only on the same target and take turns. One SPI request, byte by byte, on DMA2 stream 3, with a "forgot TXDMAEN" failure.</p><span class="src">RM0390 p.53-55, p.200, p.204, p.227-228, p.840, p.868</span><span class="st new">new style</span></a>
+  </div>
+</section>
+
+<section class="group">
   <h2>OS and runtimes <span>os/</span></h2>
   <div class="list">
     <a class="item" href="os/go-scheduler.html"><b>Go scheduler</b><p>Goroutines on OS threads: spawn, channel block, blocking system call, work stealing and a spin loop. Then what a switch costs, measured.</p><span class="src">Go runtime proc.go · go1.26.5</span><span class="st new">new style</span></a>
